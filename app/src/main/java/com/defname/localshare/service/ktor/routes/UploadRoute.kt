@@ -18,7 +18,9 @@ fun Route.upload(
         if (!featureFlagsProvider.uploadFeature.value) return@post call.respondText("Uploads are disabled.", status = HttpStatusCode.Forbidden)
 
         val remoteHost = call.request.local.remoteHost
-        if (!securityHandler.verifyAccess(call) || !securityHandler.hasUploadPermission(remoteHost)) {
+        val remoteAddress = call.request.local.remoteAddress
+        if (!securityHandler.verifyAccess(call) ||
+            !(securityHandler.hasUploadPermission(remoteHost) || securityHandler.hasUploadPermission(remoteAddress))) {
             return@post call.respondText("No Access.", status = HttpStatusCode.Forbidden)
         }
 
