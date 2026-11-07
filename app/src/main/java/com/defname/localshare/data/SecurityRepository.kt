@@ -80,7 +80,12 @@ class SecurityRepository(
     fun removeFromBlacklist(ip: String) { _blacklist.update { it - ip } }
     fun isBlacklisted(ip: String): Boolean { return _blacklist.value.contains(ip) }
 
-    fun addToWhitelist(ip: String) { _whitelist.update { it + WhiteListEntry(ip, System.currentTimeMillis()) } }
+    fun addToWhitelist(ip: String) {
+        _whitelist.update { list ->
+            val old = list.find { it.ip == ip }
+            list.filter { it.ip != ip } + WhiteListEntry(ip, System.currentTimeMillis(), old?.uploadPermission ?: UploadPermissionStatus.NOT_REQUESTED)
+        }
+    }
     fun removeFromWhitelist(ip: String) { _whitelist.update { it.filter { entry -> entry.ip != ip } } }
     fun isWhitelisted(ip: String): Boolean { return _whitelist.value.any { it.ip == ip && it.isStillValid(settings.value.whitelistEntryTTLSeconds)  } }
 
@@ -101,34 +106,30 @@ class SecurityRepository(
         _pendingRequests.update { it - ip }
     }
 
+    // Creates the whitelist entry if missing (e.g. when approval is disabled nobody is ever
+    // whitelisted, which made uploads impossible), then sets the upload status.
+    private fun setUploadStatus(ip: String, status: UploadPermissionStatus) {
+        _whitelist.update { list ->
+            val base = list.find { it.ip == ip } ?: WhiteListEntry(ip, System.currentTimeMillis())
+            list.filter { it.ip != ip } + base.copy(uploadPermission = status)
+        }
+    }
+
     fun requestUploadPermission(ip: String) {
         _pendingUploadPermissionRequests.update {
-            if (!it.contains(ip)) {
-                it + ip
-            } else {
-                it
-            }
+            if (!it.contains(ip)) it + ip else it
         }
-        _whitelist.update {
-            val entry: WhiteListEntry = it.find { entry -> entry.ip == ip } ?: return@update it
-            it.filter { entry -> entry.ip != ip } + entry.copy(uploadPermission = UploadPermissionStatus.PENDING)
-        }
+        setUploadStatus(ip, UploadPermissionStatus.PENDING)
     }
 
     fun grantUploadPermission(ip: String) {
         _pendingUploadPermissionRequests.update { it - ip }
-        _whitelist.update {
-            val entry: WhiteListEntry = it.find { entry -> entry.ip == ip } ?: return@update it
-            it.filter { entry -> entry.ip != ip } + entry.copy(uploadPermission = UploadPermissionStatus.GRANTED)
-        }
+        setUploadStatus(ip, UploadPermissionStatus.GRANTED)
     }
 
     fun denyUploadPermission(ip: String) {
         _pendingUploadPermissionRequests.update { it - ip }
-        _whitelist.update {
-            val entry: WhiteListEntry = it.find { entry -> entry.ip == ip } ?: return@update it
-            it.filter { entry -> entry.ip != ip } + entry.copy(uploadPermission = UploadPermissionStatus.DENIED)
-        }
+        setUploadStatus(ip, UploadPermissionStatus.DENIED)
     }
 
     companion object {
