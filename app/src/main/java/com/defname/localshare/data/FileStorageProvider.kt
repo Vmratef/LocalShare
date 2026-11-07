@@ -4,10 +4,12 @@ import android.content.ContentResolver
 import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.io.OutputStream
 
 interface FileStorageProvider {
@@ -24,56 +26,110 @@ class MediaStoreStorageProvider(
     private val contentResolver: ContentResolver
         get() = context.contentResolver
 
+    private fun safeName(name: String): String {
+        val cleaned = name
+            .replace(Regex("[\\\\/:*?\"<>|\\u0000-\\u001F]"), "_")
+            .trim()
+            .trim('.')
+        return cleaned.ifBlank { "file" }
+    }
+
     override suspend fun createOutputFile(
         fileName: String,
         mimeType: String,
         subFolder: String?
     ): Uri? = withContext(Dispatchers.IO) {
+        try {
+            val name = safeName(fileName)
+            val mime = mimeType.ifBlank { "application/octet-stream" }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                createViaMediaStore(name, mime, subFolder)
+            } else {
+                createViaFile(name, subFolder)
+            }
+        } catch (e: Exception) {
+            // Never crash the app because a file could not be created.
+            null
+        }
+    }
 
+    // Android 10+: /Download/LocalShare/<subFolder> through MediaStore
+    private fun createViaMediaStore(name: String, mime: String, subFolder: String?): Uri? {
         val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
 
         val values = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-            put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+            put(MediaStore.MediaColumns.MIME_TYPE, mime)
 
-            // Basis-Pfad: /Download/LocalShare
             var relativePath = Environment.DIRECTORY_DOWNLOADS + "/LocalShare"
-            
-            // Falls ein Unterordner angegeben wurde, hängen wir ihn an
             if (!subFolder.isNullOrBlank()) {
                 relativePath += "/$subFolder"
             }
-
             put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
-
-            // Android markiert Datei während des Schreibens als "in Bearbeitung"
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
 
-        contentResolver.insert(collection, values)
+        return contentResolver.insert(collection, values)
+    }
+
+    // Android 8/9 (API 26-28): MediaStore.Downloads and RELATIVE_PATH do not exist there.
+    // Save into the app's own external folder: Android/data/<app>/files/Download/LocalShare/...
+    private fun createViaFile(name: String, subFolder: String?): Uri? {
+        val base = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
+        val dir = if (subFolder.isNullOrBlank()) File(base, "LocalShare") else File(File(base, "LocalShare"), subFolder)
+        if (!dir.exists() && !dir.mkdirs()) return null
+
+        var target = File(dir, name)
+        if (target.exists()) {
+            val dot = name.lastIndexOf('.')
+            val stem = if (dot > 0) name.substring(0, dot) else name
+            val ext = if (dot > 0) name.substring(dot) else ""
+            var i = 1
+            while (target.exists()) {
+                target = File(dir, "${stem}_$i$ext")
+                i++
+            }
+        }
+        if (!target.createNewFile()) return null
+        return Uri.fromFile(target)
     }
 
     override fun openOutputStream(uri: Uri): OutputStream? {
-        return contentResolver.openOutputStream(uri)
+        return try {
+            contentResolver.openOutputStream(uri)
+        } catch (e: Exception) {
+            null
+        }
     }
 
     override suspend fun deleteFile(uri: Uri) {
         withContext(Dispatchers.IO) {
-            contentResolver.delete(uri, null, null)
+            try {
+                if (uri.scheme == "file") {
+                    uri.path?.let { File(it).delete() }
+                } else {
+                    contentResolver.delete(uri, null, null)
+                }
+            } catch (e: Exception) {
+                // ignore
+            }
         }
     }
 
     /**
-     * Nach dem Schreiben aufrufen,
-     * damit die Datei sichtbar wird.
+     * Call after writing so the file becomes visible.
      */
     override suspend fun finalizeFile(uri: Uri) {
         withContext(Dispatchers.IO) {
-            val values = ContentValues().apply {
-                put(MediaStore.MediaColumns.IS_PENDING, 0)
+            try {
+                if (uri.scheme == "file") return@withContext
+                val values = ContentValues().apply {
+                    put(MediaStore.MediaColumns.IS_PENDING, 0)
+                }
+                contentResolver.update(uri, values, null, null)
+            } catch (e: Exception) {
+                // ignore
             }
-
-            contentResolver.update(uri, values, null, null)
         }
     }
 }
