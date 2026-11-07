@@ -57,7 +57,11 @@ class TransfersViewModel(
 
     fun onGrantUpload(uploadBatch: DraftUploadBatch) {
         viewModelScope.launch {
-            uploadManager.onRequestAccepted(uploadBatch.clientIp, uploadBatch.draftId)
+            try {
+                uploadManager.onRequestAccepted(uploadBatch.clientIp, uploadBatch.draftId)
+            } catch (e: Exception) {
+                android.util.Log.e("LocalShare", "Accepting upload failed", e)
+            }
         }
     }
 
