@@ -54,7 +54,7 @@ class UploadManager(
 
         val fileErrors = mutableListOf<String>()
         val fileUris = draft.files.map { file ->
-            val uri = fileStorageProvider.createOutputFile(file.name, file.mimeType, subFolder)
+            val uri = fileStorageProvider.createOutputFile(file.name, file.mimeType, null)
             if (uri == null) {
                 fileErrors += file.checksum
                 return@map null
