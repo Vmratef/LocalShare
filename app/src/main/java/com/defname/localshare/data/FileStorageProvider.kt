@@ -5,7 +5,11 @@ import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
 import android.os.Build
+import android.media.MediaScannerConnection
 import android.os.Environment
+import androidx.core.content.ContextCompat
+import android.Manifest
+import android.content.pm.PackageManager
 import android.provider.MediaStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -73,10 +77,21 @@ class MediaStoreStorageProvider(
     }
 
     // Android 8/9 (API 26-28): MediaStore.Downloads and RELATIVE_PATH do not exist there.
-    // Save into the app's own external folder: Android/data/<app>/files/Download/LocalShare/...
+    // Save into the public Download/LocalShare folder (needs WRITE_EXTERNAL_STORAGE);
+    // if that permission is missing, fall back to the app's private folder.
     private fun createViaFile(name: String, subFolder: String?): Uri? {
-        val base = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
-        val dir = if (subFolder.isNullOrBlank()) File(base, "LocalShare") else File(File(base, "LocalShare"), subFolder)
+        val canUsePublic = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.WRITE_EXTERNAL_STORAGE
+        ) == PackageManager.PERMISSION_GRANTED &&
+            Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED
+
+        val base = if (canUsePublic) {
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        } else {
+            context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
+        }
+        val root = File(base, "LocalShare")
+        val dir = if (subFolder.isNullOrBlank()) root else File(root, subFolder)
         if (!dir.exists() && !dir.mkdirs()) return null
 
         var target = File(dir, name)
@@ -122,7 +137,11 @@ class MediaStoreStorageProvider(
     override suspend fun finalizeFile(uri: Uri) {
         withContext(Dispatchers.IO) {
             try {
-                if (uri.scheme == "file") return@withContext
+                if (uri.scheme == "file") {
+                    // make the file show up in Gallery / file managers
+                    uri.path?.let { MediaScannerConnection.scanFile(context, arrayOf(it), null, null) }
+                    return@withContext
+                }
                 val values = ContentValues().apply {
                     put(MediaStore.MediaColumns.IS_PENDING, 0)
                 }
