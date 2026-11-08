@@ -146,7 +146,8 @@ export interface UploadFile {
     size: number,
     state: UploadFileState,
     progress?: number,
-    errorMessage?: string
+    errorMessage?: string,
+    previewUrl?: string
 }
 
 
