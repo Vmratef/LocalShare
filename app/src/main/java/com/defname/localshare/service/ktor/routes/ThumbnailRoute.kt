@@ -38,6 +38,15 @@ fun Route.getThumbnail(
             return@get call.respondText("File not found.\n", status = HttpStatusCode.NotFound)
         }
 
+        if (com.defname.localshare.util.ApkIcon.isApk(fileInfo.name, fileInfo.mimeType)) {
+            val appIcon = com.defname.localshare.util.ApkIcon.loadBitmap(context, fileInfo.uri, fileInfo.size, 256)
+            if (appIcon != null) {
+                val pngStream = ByteArrayOutputStream()
+                appIcon.compress(Bitmap.CompressFormat.PNG, 100, pngStream)
+                return@get call.respondBytes(pngStream.toByteArray(), ContentType.Image.PNG)
+            }
+        }
+
         val thumbnail: Bitmap? = fileInfoProvider.getThumbnail(fileInfo.uri)
 
         if (thumbnail == null) {
