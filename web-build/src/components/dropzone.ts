@@ -4,6 +4,7 @@
 
 import Alpine from 'alpinejs';
 import { UploadBatch, UploadBatchState } from '../models/UploadBatch';
+import { humanFileSize } from '../utils';
 
 export const Dropzone = () => ({
     activeBatch: null as UploadBatch | null,
@@ -85,6 +86,8 @@ export const Dropzone = () => ({
             alert('Could not start upload.');
         }
     },
+
+    humanFileSize(size: number) { return humanFileSize(size); },
 
     dragOver() { this.dragActive = true; },
     dragLeave() { this.dragActive = false; }
