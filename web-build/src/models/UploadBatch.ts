@@ -85,9 +85,15 @@ export class UploadBatch {
         const checksum = await this.calculateChecksum(file);
         if (this.files.some(f => f.checksum === checksum)) return;
 
+        const mime = file.type || 'application/octet-stream';
+        const previewUrl = (mime.startsWith('image/') || mime.startsWith('video/'))
+            ? URL.createObjectURL(file)
+            : undefined;
+
         this.files.push({
             checksum: checksum,
             file: file,
+            previewUrl: previewUrl,
             name: file.name,
             mimeType: file.type || 'application/octet-stream',
             size: file.size,
@@ -97,6 +103,8 @@ export class UploadBatch {
     }
 
     removeFile(checksum: string) {
+        const removed = this.files.find(f => f.checksum === checksum);
+        if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl);
         this.files = this.files.filter(f => f.checksum !== checksum);
     }
 
