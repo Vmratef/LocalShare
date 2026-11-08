@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LibraryAddCheck
@@ -25,6 +26,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -33,6 +37,7 @@ import com.defname.localshare.R
 import com.defname.localshare.ui.components.HintCard
 import com.defname.localshare.ui.screens.files.components.AddFilesFab
 import com.defname.localshare.ui.screens.files.components.FileList
+import com.defname.localshare.ui.screens.files.components.InstalledAppsDialog
 import com.defname.localshare.ui.screens.files.components.SortingButton
 import com.defname.localshare.ui.theme.LocalShareTheme
 import org.koin.androidx.compose.koinViewModel
@@ -44,6 +49,7 @@ fun FilesScreen(
     onOpenDrawer: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
+    var showAppsDialog by remember { mutableStateOf(false) }
 
     val filePickerDialog = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
         viewModel.addFiles(uris)
@@ -79,6 +85,9 @@ fun FilesScreen(
                             Icon(Icons.Default.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error)
                         }
                     } else {
+                        IconButton(onClick = { showAppsDialog = true }) {
+                            Icon(Icons.Default.Android, contentDescription = "Share installed app")
+                        }
                         SortingButton(
                             isMenuOpen = state.isSortingMenuOpen,
                             sortedBy = state.sortedBy,
@@ -118,6 +127,16 @@ fun FilesScreen(
                 )
             }
         }
+    }
+
+    if (showAppsDialog) {
+        InstalledAppsDialog(
+            onDismiss = { showAppsDialog = false },
+            onConfirm = { apps ->
+                viewModel.addApps(apps)
+                showAppsDialog = false
+            }
+        )
     }
 }
 

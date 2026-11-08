@@ -5,6 +5,10 @@
 package com.defname.localshare.ui.screens.files
 
 import android.net.Uri
+import com.defname.localshare.IconMap
+import com.defname.localshare.ui.screens.files.components.InstalledApp
+import com.defname.localshare.util.ApkIcon
+import java.io.File
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.defname.localshare.data.ServiceRepository
@@ -104,6 +108,34 @@ class FilesViewModel(
 
     fun addFiles(uris: List<Uri>) {
         addFilesUseCase(uris)
+    }
+
+    // Shares installed apps by exposing their .apk file(s) straight from the device.
+    fun addApps(apps: List<InstalledApp>) {
+        for (app in apps) {
+            val safeLabel = app.label
+                .replace(Regex("[\\\\/:*?\"<>|]"), "_")
+                .trim()
+                .ifBlank { app.packageName }
+            app.apkPaths.forEachIndexed { index, path ->
+                val file = File(path)
+                if (file.exists()) {
+                    val name = if (index == 0) "$safeLabel.apk" else "${safeLabel}_${file.name}"
+                    val uri = Uri.fromFile(file)
+                    val mime = ApkIcon.APK_MIME
+                    serviceRepository.addFile(
+                        FileInfo(
+                            id = Integer.toHexString(uri.toString().hashCode()).lowercase(),
+                            uri = uri,
+                            name = name,
+                            size = file.length(),
+                            mimeType = mime,
+                            iconFile = IconMap.getIcon(mime)
+                        )
+                    )
+                }
+            }
+        }
     }
 
     fun selectAll() {
