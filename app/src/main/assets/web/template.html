@@ -105,7 +105,7 @@
         <!-- Permission State -->
         <div x-show="$store.app.uploadPermissionStatus === 'not_requested' || $store.app.uploadPermissionStatus === 'denied'" class="text-center py-4">
             <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Upload Permission Required</h3>
-            <p class="text-sm text-gray-600 dark:text-gray-4<div class="max-w-6xl mx-auto p-4">00 mb-6">Request permission from the device owner to upload files.</p>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">Request permission from the device owner to upload files.</p>
             <button @click="$store.app.requestUploadPermission()" class="ls-btn-primary w-full py-3">Request Permission</button>
         </div>
 
@@ -132,9 +132,23 @@
 
                     <div class="flex flex-wrap gap-2 justify-center" x-show="files.length > 0">
                         <template x-for="(file, index) in files" :key="index">
-                            <div class="relative w-16 h-16 bg-white dark:bg-slate-700 rounded shadow p-1">
-                                <span class="text-[8px] truncate block" x-text="file.name"></span>
-                                <button @click.stop="removeFile(index)" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 text-[10px]">×</button>
+                            <div class="relative w-24 bg-white dark:bg-slate-700 rounded shadow overflow-hidden text-left">
+                                <div class="w-24 h-24 bg-gray-100 dark:bg-slate-600 flex items-center justify-center">
+                                    <template x-if="file.previewUrl && file.mimeType.startsWith('image/')">
+                                        <img :src="file.previewUrl" alt="" class="w-full h-full object-cover">
+                                    </template>
+                                    <template x-if="file.previewUrl && file.mimeType.startsWith('video/')">
+                                        <video :src="file.previewUrl + '#t=0.5'" preload="metadata" muted playsinline class="w-full h-full object-cover"></video>
+                                    </template>
+                                    <template x-if="!file.previewUrl">
+                                        <span class="text-3xl">📄</span>
+                                    </template>
+                                </div>
+                                <div class="px-1 py-1">
+                                    <span class="text-[10px] truncate block" x-text="file.name"></span>
+                                    <span class="text-[9px] text-gray-500 block" x-text="humanFileSize(file.size)"></span>
+                                </div>
+                                <button type="button" @click.stop="removeFile(index)" class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs">×</button>
                             </div>
                         </template>
                     </div>
@@ -152,29 +166,43 @@
 </div>
 
 <div class="max-w-6xl mx-auto p-4">
-    <!-- Active Uploads Progress -->
+    <!-- Sent files (stays visible until the page is reloaded) -->
     <div x-show="$store.app.uploadBatches.some(b => b.state >= 4 && b.state < 8)" class="mb-6 space-y-2" x-cloak>
-        <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider">Active Uploads</h3>
+        <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider">Sent files</h3>
         <template x-for="batch in $store.app.uploadBatches" :key="batch.draftId">
             <div x-show="batch.state >= 4 && batch.state < 8" class="space-y-2">
                 <template x-for="file in batch.files" :key="file.checksum">
-                    <div class="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-3 border border-gray-100 dark:border-slate-700">
-                        <div class="flex items-center justify-between mb-1">
-                            <span class="text-sm font-medium truncate flex-1" 
-                                  :class="file.state === 4 ? 'text-red-500' : ''"
-                                  x-text="file.name"></span>
-                            <span class="text-xs font-mono ml-2"
-                                  :class="file.state === 4 ? 'text-red-500' : file.state == 3 ? 'text-green-500' : 'text-gray-500'"
-                                  x-text="file.state === 4 ? 'Error' : file.state === 3 ? '✔' : ((file.progress / file.size * 100)|0) + '%'"></span>
+                    <div class="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-3 border border-gray-100 dark:border-slate-700 flex items-center gap-3">
+                        <div class="w-14 h-14 flex-shrink-0 rounded overflow-hidden bg-gray-100 dark:bg-slate-700 flex items-center justify-center">
+                            <template x-if="file.previewUrl && file.mimeType.startsWith('image/')">
+                                <img :src="file.previewUrl" alt="" class="w-full h-full object-cover">
+                            </template>
+                            <template x-if="file.previewUrl && file.mimeType.startsWith('video/')">
+                                <video :src="file.previewUrl + '#t=0.5'" preload="metadata" muted playsinline class="w-full h-full object-cover"></video>
+                            </template>
+                            <template x-if="!file.previewUrl">
+                                <span class="text-2xl">📄</span>
+                            </template>
                         </div>
-                        <div class="ls-progress-container">
-                            <div class="ls-progress-bar" 
-                                 :class="file.state === 4 ? 'error' : 'success'"
-                                 :style="'width: ' + (file.state === 4 || file.state === 3 ? '100%' : ((file.progress / file.size * 100)|0) + '%')"></div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-sm font-medium truncate flex-1"
+                                      :class="file.state === 4 ? 'text-red-500' : ''"
+                                      x-text="file.name"></span>
+                                <span class="text-xs font-mono ml-2"
+                                      :class="file.state === 4 ? 'text-red-500' : file.state == 3 ? 'text-green-500' : 'text-gray-500'"
+                                      x-text="file.state === 4 ? 'Error' : file.state === 3 ? '✔ Sent' : ((file.progress / file.size * 100)|0) + '%'"></span>
+                            </div>
+                            <p class="text-[10px] text-gray-500 mb-1" x-text="humanFileSize(file.size)"></p>
+                            <div class="ls-progress-container">
+                                <div class="ls-progress-bar"
+                                     :class="file.state === 4 ? 'error' : 'success'"
+                                     :style="'width: ' + (file.state === 4 || file.state === 3 ? '100%' : ((file.progress / file.size * 100)|0) + '%')"></div>
+                            </div>
+                            <template x-if="file.state === 4">
+                                <p class="text-[10px] text-red-400 mt-1" x-text="file.errorMessage || 'Upload failed'"></p>
+                            </template>
                         </div>
-                        <template x-if="file.state === 4">
-                             <p class="text-[10px] text-red-400 mt-1" x-text="file.errorMessage || 'Upload failed'"></p>
-                        </template>
                     </div>
                 </template>
             </div>
