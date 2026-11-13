@@ -59,7 +59,6 @@ fun GlassBottomBar(
         shape = RoundedCornerShape(34.dp),
         color = glassColor,
         border = BorderStroke(1.dp, borderBrush),
-        shadowElevation = 14.dp,
         tonalElevation = 0.dp
     ) {
         Row(
