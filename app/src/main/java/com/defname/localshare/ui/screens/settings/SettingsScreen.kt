@@ -4,6 +4,7 @@
 
 package com.defname.localshare.ui.screens.settings
 
+import com.defname.localshare.ui.components.ThemeToggleButton
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -64,6 +65,7 @@ fun SettingsScreen(
                         Icon(Icons.Default.Menu, contentDescription = null)
                     }
                 },
+                actions = { ThemeToggleButton() },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant
                 )
