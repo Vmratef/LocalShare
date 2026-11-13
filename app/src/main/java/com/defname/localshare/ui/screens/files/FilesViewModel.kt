@@ -11,6 +11,8 @@ import com.defname.localshare.util.ApkIcon
 import java.io.File
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.defname.localshare.data.ReceivedFile
+import com.defname.localshare.data.ReceivedFilesStore
 import com.defname.localshare.data.ServiceRepository
 import com.defname.localshare.domain.model.FileInfo
 import com.defname.localshare.domain.usecase.AddFilesUseCase
@@ -19,6 +21,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 private data class InternalState(
     val selectedFiles: Set<Uri> = emptySet(),
@@ -30,14 +33,30 @@ private data class InternalState(
 
 class FilesViewModel(
     private val serviceRepository: ServiceRepository,
-    private val addFilesUseCase: AddFilesUseCase
+    private val addFilesUseCase: AddFilesUseCase,
+    private val receivedFilesStore: ReceivedFilesStore
 ) : ViewModel() {
     private val _internalState = MutableStateFlow(InternalState())
+    private val _receivedFiles = MutableStateFlow<List<ReceivedFile>>(emptyList())
+
+    init {
+        // reload whenever a new file was received
+        viewModelScope.launch {
+            receivedFilesStore.version.collect { refreshReceived() }
+        }
+    }
+
+    fun refreshReceived() {
+        viewModelScope.launch {
+            _receivedFiles.value = receivedFilesStore.load()
+        }
+    }
 
     val state = combine(
         serviceRepository.fileList,
-        _internalState
-    ) { fileList, internalState ->
+        _internalState,
+        _receivedFiles
+    ) { fileList, internalState, receivedFiles ->
         val filteredFiles = fileList.filter { 
             it.name.contains(internalState.searchQuery, ignoreCase = true)
         }
@@ -55,7 +74,8 @@ class FilesViewModel(
             sortedBy = internalState.sortedBy,
             sortedAscending = internalState.sortedAscending,
             isSortingMenuOpen = internalState.isSortingMenuOpen,
-            searchQuery = internalState.searchQuery
+            searchQuery = internalState.searchQuery,
+            receivedFiles = receivedFiles
         )
     }.stateIn(
         scope = viewModelScope,

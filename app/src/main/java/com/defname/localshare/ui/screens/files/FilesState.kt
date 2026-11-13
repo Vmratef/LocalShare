@@ -7,6 +7,7 @@ package com.defname.localshare.ui.screens.files
 import android.net.Uri
 import androidx.annotation.StringRes
 import com.defname.localshare.R
+import com.defname.localshare.data.ReceivedFile
 import com.defname.localshare.domain.model.FileInfo
 
 data class FilesState(
@@ -15,7 +16,8 @@ data class FilesState(
     val sortedBy: FilesSortType = FilesSortType.NAME,
     val sortedAscending: Boolean = true,
     val isSortingMenuOpen: Boolean = false,
-    val searchQuery: String = ""
+    val searchQuery: String = "",
+    val receivedFiles: List<ReceivedFile> = emptyList()
 )
 
 enum class FilesSortType(@StringRes val labelRes: Int) {

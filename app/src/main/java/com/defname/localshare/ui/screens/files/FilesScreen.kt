@@ -7,7 +7,21 @@ package com.defname.localshare.ui.screens.files
 import com.defname.localshare.ui.components.ThemeToggleButton
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import com.defname.localshare.ui.screens.files.components.ReceivedFileList
+import com.defname.localshare.ui.theme.LocalDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -51,6 +65,12 @@ fun FilesScreen(
 ) {
     val state by viewModel.state.collectAsState()
     var showAppsDialog by remember { mutableStateOf(false) }
+    // 0 = received files (default), 1 = files I share
+    var tab by rememberSaveable { mutableStateOf(0) }
+
+    LaunchedEffect(tab) {
+        if (tab == 0) viewModel.refreshReceived()
+    }
 
     val filePickerDialog = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
         viewModel.addFiles(uris)
@@ -60,14 +80,14 @@ fun FilesScreen(
         topBar = {
             TopAppBar(
                 title = { 
-                    if (state.selectedFiles.isNotEmpty()) {
+                    if (tab == 1 && state.selectedFiles.isNotEmpty()) {
                         Text("${state.selectedFiles.size} selected")
                     } else {
                         Text(stringResource(R.string.screen_files_title))
                     }
                 },
                 navigationIcon = {
-                    if (state.selectedFiles.isNotEmpty()) {
+                    if (tab == 1 && state.selectedFiles.isNotEmpty()) {
                         IconButton(onClick = { viewModel.onClearSelection() }) {
                             Icon(Icons.Default.Close, contentDescription = "Cancel")
                         }
@@ -78,7 +98,9 @@ fun FilesScreen(
                     }
                 },
                 actions = {
-                    if (state.selectedFiles.isNotEmpty()) {
+                    if (tab == 0) {
+                        ThemeToggleButton()
+                    } else if (state.selectedFiles.isNotEmpty()) {
                         IconButton(onClick = { viewModel.selectAll() }) {
                             Icon(Icons.Default.LibraryAddCheck, contentDescription = "Select All")
                         }
@@ -105,7 +127,7 @@ fun FilesScreen(
             )
         },
         floatingActionButton = {
-            if (state.selectedFiles.isEmpty()) {
+            if (tab == 1 && state.selectedFiles.isEmpty()) {
                 AddFilesFab(onOpenAddFilesDialog = { filePickerDialog.launch("*/*") })
             }
         }
@@ -115,7 +137,11 @@ fun FilesScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            if (state.fileList.isNotEmpty()) {
+            FilesTabs(selected = tab, onSelect = { tab = it })
+
+            if (tab == 0) {
+                ReceivedFileList(files = state.receivedFiles)
+            } else if (state.fileList.isNotEmpty()) {
                 FileList(
                     files = state.fileList,
                     selectedFiles = state.selectedFiles,
@@ -139,6 +165,42 @@ fun FilesScreen(
                 showAppsDialog = false
             }
         )
+    }
+}
+
+@Composable
+private fun FilesTabs(selected: Int, onSelect: (Int) -> Unit) {
+    val dark = LocalDarkTheme.current
+    val trackColor = if (dark) Color.White.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.55f)
+    val activeColor = if (dark) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.95f)
+    val labels = listOf("Received", "Shared")
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .clip(RoundedCornerShape(22.dp))
+            .background(trackColor)
+            .padding(4.dp)
+    ) {
+        labels.forEachIndexed { index, label ->
+            val isSelected = index == selected
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(if (isSelected) activeColor else Color.Transparent)
+                    .clickable { onSelect(index) }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = label,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
     }
 }
 
