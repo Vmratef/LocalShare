@@ -2,6 +2,7 @@ package com.defname.localshare.domain.manager
 
 import com.defname.localshare.IconMap
 import com.defname.localshare.data.FileStorageProvider
+import com.defname.localshare.data.ReceivedFilesStore
 import com.defname.localshare.data.ServiceRepository
 import com.defname.localshare.data.UploadRepository
 import com.defname.localshare.domain.model.DraftUploadBatch
@@ -26,7 +27,8 @@ class UploadManager(
     private val uploadRepository: UploadRepository,
     private val fileStorageProvider: FileStorageProvider,
     private val featureFlagsProvider: FeatureFlagsProvider,
-    private val serviceRepository: ServiceRepository
+    private val serviceRepository: ServiceRepository,
+    private val receivedFilesStore: ReceivedFilesStore
 ) {
     private val _openUploadRequests = MutableStateFlow(emptyList<DraftUploadBatch>())
     val openUploadRequests = _openUploadRequests.asStateFlow()
@@ -63,7 +65,12 @@ class UploadManager(
         _uploadEvents.emit(event to clientIp)
     }
 
-    suspend fun onRequestAccepted(clientIp: String, draftId: Int) {
+    /**
+     * @param relayOnly true  -> files go to the app's private cache and are only offered to the OTHER
+     *                          devices (this device does not keep them in Downloads).
+     *                  false -> files are saved in Download/LocalShare on this device (and offered too).
+     */
+    suspend fun onRequestAccepted(clientIp: String, draftId: Int, relayOnly: Boolean = false) {
         val draft = removeRequest(clientIp, draftId) ?: return
         
         val batchId = java.util.UUID.randomUUID().toString().take(6)
@@ -72,7 +79,11 @@ class UploadManager(
 
         val fileErrors = mutableListOf<String>()
         val fileUris = draft.files.map { file ->
-            val uri = fileStorageProvider.createOutputFile(file.name, file.mimeType, null)
+            val uri = if (relayOnly) {
+                fileStorageProvider.createRelayFile(file.name)
+            } else {
+                fileStorageProvider.createOutputFile(file.name, file.mimeType, null)
+            }
             if (uri == null) {
                 fileErrors += file.checksum
                 return@map null
@@ -85,7 +96,7 @@ class UploadManager(
             return
         }
 
-        uploadRepository.initNewUploadBatch(batchId, draft, fileUris)
+        uploadRepository.initNewUploadBatch(batchId, draft, fileUris, relayOnly)
 
         val event = EventEnvelop(event = WebEvent.UploadAccepted(draftId, batchId))
         _uploadEvents.emit(event to clientIp)
@@ -174,7 +185,10 @@ class UploadManager(
             val actualHash = digest.digest().joinToString("") { "%02x".format(it) }
             
             if (actualHash.equals(fileHash, ignoreCase = true)) {
-                fileStorageProvider.finalizeFile(uri)
+                if (!batch.relayOnly) {
+                    fileStorageProvider.finalizeFile(uri)
+                    receivedFilesStore.record(uri, file.name, file.size, clientIp)
+                }
                 uploadRepository.updateFileState(batchId, fileHash, UploadFileState.Finished)
 
                 // Offer the received file to the OTHER connected devices (they can accept or decline).
@@ -208,6 +222,40 @@ class UploadManager(
             uploadRepository.updateFileState(batchId, fileHash, UploadFileState.Error)
             emitFileError(clientIp, batchId, fileHash, "Upload failed: ${e.message}")
         }
+    }
+
+    /**
+     * Later decision: also keep a relayed batch on THIS device (copies it to Download/LocalShare).
+     */
+    suspend fun saveRelayBatchToDevice(batchId: String): Int {
+        val batch = uploadRepository.getBatch(batchId) ?: return 0
+        if (!batch.relayOnly) return 0
+
+        var saved = 0
+        var allSaved = true
+        val newFiles = batch.files.map { file ->
+            val source = file.uri
+            if (source == null || file.state !is UploadFileState.Finished) {
+                return@map file
+            }
+            val target = fileStorageProvider.createOutputFile(file.name, file.mimeType, null)
+            if (target == null) {
+                allSaved = false
+                return@map file
+            }
+            if (fileStorageProvider.copyFile(source, target)) {
+                fileStorageProvider.finalizeFile(target)
+                receivedFilesStore.record(target, file.name, file.size, batch.clientIp)
+                saved++
+                file.copy(uri = target)
+            } else {
+                fileStorageProvider.deleteFile(target)
+                allSaved = false
+                file
+            }
+        }
+        uploadRepository.updateBatch(batch.copy(files = newFiles, relayOnly = !(saved > 0 && allSaved)))
+        return saved
     }
 
     private fun findRequest(clientIp: String, draftId: Int) = _openUploadRequests.value.find { it.draftId == draftId && it.clientIp == clientIp }
