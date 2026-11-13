@@ -70,6 +70,17 @@ sealed class WebEvent {
     @Serializable @SerialName("remove_file")
     data class RemoveFile(val id: String) : WebEvent()
 
+    // Another device just uploaded this file: offer it to this device (download or decline).
+    @Serializable @SerialName("incoming_file")
+    data class IncomingFile(
+        val id: String,
+        val name: String,
+        val size: Long,
+        val mimeType: String,
+        val iconFile: String,
+        val from: String
+    ) : WebEvent()
+
     @Serializable @SerialName("add_text")
     data class AddText(
         val id: Int,
