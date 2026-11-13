@@ -52,6 +52,12 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Card
+import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.SwapHoriz
+import com.defname.localshare.ui.components.GlassCard
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
@@ -86,17 +92,15 @@ fun DraftBatchCard(
     batch: DraftUploadBatch,
     onGrant: () -> Unit,
     onDeny: () -> Unit,
+    onRelay: () -> Unit = onGrant,
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    Card(
+    GlassCard(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        )
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         Column(
             modifier = Modifier
@@ -143,28 +147,47 @@ fun DraftBatchCard(
                     text = "Total Size: ${batch.files.sumOf { it.size }.sizeAsString()}",
                     style = MaterialTheme.typography.bodyMedium
                 )
-                Row {
-                    FilledTonalIconButton(
-                        onClick = onDeny,
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    ) {
-                        Icon(Icons.Default.Close, contentDescription = "Deny")
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    FilledIconButton(
-                        onClick = onGrant,
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        )
-                    ) {
-                        Icon(Icons.Default.Check, contentDescription = "Grant")
-                    }
+                FilledTonalIconButton(
+                    onClick = onDeny,
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = "Deny")
                 }
             }
+
+            Spacer(Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilledTonalButton(
+                    onClick = onRelay,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.SwapHoriz, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Relay only")
+                }
+                Button(
+                    onClick = onGrant,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Save here")
+                }
+            }
+
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Relay only: other devices can download it, but it is not saved on this device.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
             AnimatedVisibility(visible = expanded) {
                 Column(modifier = Modifier.padding(top = 16.dp)) {
@@ -182,15 +205,15 @@ fun DraftBatchCard(
 @Composable
 fun ActiveBatchCard(
     batch: UploadBatch,
+    onSaveToDevice: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    Card(
+    GlassCard(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         Column(
             modifier = Modifier
@@ -259,6 +282,28 @@ fun ActiveBatchCard(
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                }
+            }
+
+            if (batch.relayOnly) {
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Relay only - not saved on this device",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (batch.files.isNotEmpty() && batch.files.all { it.state is UploadFileState.Finished }) {
+                        TextButton(onClick = onSaveToDevice) {
+                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Save here too")
+                        }
                     }
                 }
             }
