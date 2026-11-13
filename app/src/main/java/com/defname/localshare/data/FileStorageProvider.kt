@@ -79,6 +79,7 @@ class MediaStoreStorageProvider(
     // Android 8/9 (API 26-28): MediaStore.Downloads and RELATIVE_PATH do not exist there.
     // Save into the public Download/LocalShare folder (needs WRITE_EXTERNAL_STORAGE);
     // if that permission is missing, fall back to the app's private folder.
+    @Synchronized
     private fun createViaFile(name: String, subFolder: String?): Uri? {
         val canUsePublic = ContextCompat.checkSelfPermission(
             context, Manifest.permission.WRITE_EXTERNAL_STORAGE
