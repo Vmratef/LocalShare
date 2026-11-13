@@ -29,7 +29,7 @@ fun Route.getThumbnail(
             return@get call.respondText("No Access.", status = HttpStatusCode.Forbidden)
         }
 
-        val fileList = serviceRepository.fileList.first()
+        val fileList = serviceRepository.fileList.first() + serviceRepository.receivedFiles.value
 
         val requestedFile = call.parameters["file"]
 

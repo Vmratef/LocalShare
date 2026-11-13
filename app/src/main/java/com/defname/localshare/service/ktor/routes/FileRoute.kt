@@ -30,7 +30,9 @@ fun Route.getFile(
             return@get call.respondText("No Access.", status = HttpStatusCode.Forbidden)
         }
 
-        val fileList = serviceRepository.fileList.first()
+        val sharedFiles = serviceRepository.fileList.first()
+        // received files are only reachable by their explicit id (never in the ZIP / default file)
+        val fileList = if (requestedFile != null) sharedFiles + serviceRepository.receivedFiles.value else sharedFiles
 
         if (fileList.isEmpty()) {
             return@get call.respondText("No File Selected\n", status = HttpStatusCode.NotFound)
