@@ -32,6 +32,13 @@ class UploadManager(
     val openUploadRequests = _openUploadRequests.asStateFlow()
 
     // Buffered, so one slow/stuck browser can never block the uploads of the other devices.
+    // (received file, uploader ip) -> the other devices get an "incoming file" offer
+    private val _receivedFileEvents = MutableSharedFlow<Pair<FileInfo, String>>(
+        extraBufferCapacity = 64,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    val receivedFileEvents = _receivedFileEvents.asSharedFlow()
+
     private val _uploadEvents = MutableSharedFlow<Pair<EventEnvelop, String>>(
         extraBufferCapacity = 512,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
@@ -170,19 +177,18 @@ class UploadManager(
                 fileStorageProvider.finalizeFile(uri)
                 uploadRepository.updateFileState(batchId, fileHash, UploadFileState.Finished)
 
-                // Publish the received file in the shared list, so every other device on the
-                // web page sees it (and can download it) right away.
+                // Offer the received file to the OTHER connected devices (they can accept or decline).
                 val sharedMime = file.mimeType.ifBlank { "application/octet-stream" }
-                serviceRepository.addFile(
-                    FileInfo(
-                        id = Integer.toHexString(uri.toString().hashCode()).lowercase(),
-                        uri = uri,
-                        name = file.name,
-                        size = file.size,
-                        mimeType = sharedMime,
-                        iconFile = IconMap.getIcon(sharedMime)
-                    )
+                val receivedInfo = FileInfo(
+                    id = Integer.toHexString(uri.toString().hashCode()).lowercase(),
+                    uri = uri,
+                    name = file.name,
+                    size = file.size,
+                    mimeType = sharedMime,
+                    iconFile = IconMap.getIcon(sharedMime)
                 )
+                serviceRepository.addReceivedFile(receivedInfo)
+                _receivedFileEvents.emit(receivedInfo to clientIp)
 
                 val event = EventEnvelop(
                     event = WebEvent.UploadUpdated(
