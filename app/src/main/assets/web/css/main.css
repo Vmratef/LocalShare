@@ -196,3 +196,247 @@
     @apply mt-20 p-8 text-center text-gray-400 dark:text-slate-500 text-sm border-t border-gray-100 dark:border-slate-800;
   }
 }
+/* ==========================================
+   LocalShare Brand Theme
+   ========================================== */
+
+:root {
+    color-scheme: light;
+
+    --ls-bg: #FBFAF2;
+    --ls-surface: rgba(255, 253, 240, .82);
+    --ls-text: #202729;
+    --ls-muted: #657176;
+    --ls-border: rgba(58, 110, 165, .16);
+
+    --ls-primary: #CB3534;
+    --ls-primary-hover: #991613;
+    --ls-secondary: #3A6EA5;
+    --ls-accent: #718A3F;
+
+    --ls-shadow: 0 16px 42px rgba(32, 39, 41, .10);
+}
+
+html.dark {
+    color-scheme: dark;
+
+    --ls-bg: #0B1215;
+    --ls-surface: rgba(21, 32, 37, .82);
+    --ls-text: #EAF0F1;
+    --ls-muted: #AAB9BE;
+    --ls-border: rgba(141, 182, 222, .18);
+
+    --ls-primary: #E46B68;
+    --ls-primary-hover: #F08A86;
+    --ls-secondary: #8DB6DE;
+    --ls-accent: #C1D493;
+
+    --ls-shadow: 0 18px 46px rgba(0, 0, 0, .28);
+}
+
+/* Background */
+
+body {
+    color: var(--ls-text);
+
+    background:
+        radial-gradient(
+            ellipse at 12% 8%,
+            rgba(203, 53, 52, .075),
+            transparent 34%
+        ),
+        radial-gradient(
+            ellipse at 88% 14%,
+            rgba(58, 110, 165, .10),
+            transparent 38%
+        ),
+        linear-gradient(
+            135deg,
+            #FFFDF0,
+            #F2F6FC 55%,
+            #FFF5EE
+        );
+
+    background-attachment: fixed;
+}
+
+html.dark body {
+    background:
+        radial-gradient(
+            ellipse at 12% 8%,
+            rgba(203, 53, 52, .12),
+            transparent 34%
+        ),
+        radial-gradient(
+            ellipse at 88% 14%,
+            rgba(58, 110, 165, .16),
+            transparent 38%
+        ),
+        linear-gradient(
+            135deg,
+            #0B1215,
+            #142027 58%,
+            #172229
+        );
+
+    background-attachment: fixed;
+}
+
+/* Header and toolbar */
+
+.ls-header,
+.ls-toolbar {
+    background: var(--ls-surface);
+    border-color: var(--ls-border);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+}
+
+.ls-header {
+    border-bottom: 1px solid var(--ls-border);
+}
+
+.ls-toolbar {
+    border: 1px solid var(--ls-border);
+    box-shadow: var(--ls-shadow);
+}
+
+/* Primary buttons */
+
+.ls-btn-primary {
+    background: var(--ls-primary);
+    color: white;
+    box-shadow: 0 8px 20px rgba(203, 53, 52, .18);
+}
+
+.ls-btn-primary:hover {
+    background: var(--ls-primary-hover);
+}
+
+/* Secondary buttons */
+
+.ls-btn-secondary,
+.ls-btn-icon,
+.ls-btn-toolbar {
+    color: var(--ls-text);
+    background: rgba(58, 110, 165, .08);
+    border: 1px solid var(--ls-border);
+}
+
+.ls-btn-secondary:hover,
+.ls-btn-icon:hover,
+.ls-btn-toolbar:hover {
+    background: rgba(58, 110, 165, .15);
+}
+
+/* View switcher */
+
+.ls-btn-view-switcher.active {
+    color: var(--ls-primary-hover);
+    background: rgba(203, 53, 52, .10);
+}
+
+html.dark .ls-btn-view-switcher.active {
+    color: #FFDAD7;
+    background: rgba(228, 107, 104, .17);
+}
+
+/* Cards */
+
+.ls-card-grid,
+.ls-card-list {
+    background: var(--ls-surface);
+    border: 1px solid var(--ls-border);
+    box-shadow: var(--ls-shadow);
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+}
+
+/* Modal */
+
+.ls-modal-container {
+    background: var(--ls-surface);
+    color: var(--ls-text);
+    border: 1px solid var(--ls-border);
+    backdrop-filter: blur(28px);
+}
+
+/* Sidebar */
+
+.ls-sidebar-panel {
+    background: var(--ls-surface);
+    border-color: var(--ls-border);
+    backdrop-filter: blur(28px);
+}
+
+.ls-sidebar-content-item {
+    background: rgba(58, 110, 165, .06);
+    border-color: var(--ls-border);
+}
+
+.ls-sidebar-text,
+.ls-file-name {
+    color: var(--ls-text);
+}
+
+.ls-file-size {
+    color: var(--ls-muted);
+}
+
+/* Progress */
+
+.ls-progress-container {
+    background: rgba(58, 110, 165, .14);
+}
+
+.ls-progress-bar.success {
+    background: #ADC178;
+}
+
+.ls-progress-bar.error {
+    background: #CB3534;
+}
+
+/* Slideshow */
+
+.ls-slideshow-container {
+    background: var(--ls-surface);
+    border-color: var(--ls-border);
+}
+
+.ls-slideshow-btn-action.primary {
+    background: var(--ls-secondary);
+}
+
+/* Dropzone */
+
+.ls-dropzone {
+    background: rgba(58, 110, 165, .045);
+}
+
+.ls-dropzone.active {
+    border-color: var(--ls-secondary);
+    background: rgba(58, 110, 165, .12);
+}
+
+/* Footer */
+
+.ls-main-footer {
+    color: var(--ls-muted);
+    border-color: var(--ls-border);
+}
+
+/* Native controls */
+
+input,
+select,
+textarea {
+    accent-color: var(--ls-primary);
+}
+
+/* Selection */
+
+::selection {
+    color: white;
+    background: #CB3534;
+}
