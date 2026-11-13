@@ -25,6 +25,27 @@
       @keydown.window.left="isSlideshow && prevSlide()"
       @keydown.window.right="isSlideshow && nextSlide()">
 
+<!-- Incoming files from other devices: download or decline -->
+<div x-show="incoming.length > 0" x-cloak
+     class="fixed bottom-4 right-4 z-50 flex flex-col gap-3 w-80 max-w-full">
+    <template x-for="item in incoming" :key="item.fileId">
+        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-3">
+            <div class="flex items-center gap-3">
+                <img :src="incomingThumb(item)" alt="" class="w-14 h-14 rounded object-cover bg-gray-100 dark:bg-gray-700">
+                <div class="min-w-0 flex-1">
+                    <div class="text-xs text-gray-500 dark:text-gray-400" x-text="'Incoming from ' + item.from"></div>
+                    <div class="font-semibold truncate text-gray-800 dark:text-white" x-text="item.filename"></div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400" x-text="humanFileSize(item.size)"></div>
+                </div>
+            </div>
+            <div class="flex gap-2 mt-3">
+                <button type="button" @click="acceptIncoming(item)" class="ls-btn-primary flex-1 py-2">Download</button>
+                <button type="button" @click="dismissIncoming(item)" class="ls-btn-secondary flex-1 py-2">Decline</button>
+            </div>
+        </div>
+    </template>
+</div>
+
 <header class="ls-header">
     <div class="flex items-center gap-4">
         <img src="/{{token}}/favicon/medium" alt="Logo" class="w-10 h-10" />
