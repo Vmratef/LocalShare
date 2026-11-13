@@ -6,6 +6,7 @@ package com.defname.localshare.ui.screens.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.defname.localshare.data.ReceivedFilesStore
 import com.defname.localshare.data.ServiceRepository
 import com.defname.localshare.domain.model.Settings
 import com.defname.localshare.domain.repository.SettingsRepository
@@ -15,7 +16,8 @@ import kotlinx.coroutines.launch
 
 class SettingsViewModel(
     private val settingsRepository: SettingsRepository,
-    private val serviceRepository: ServiceRepository
+    private val serviceRepository: ServiceRepository,
+    private val receivedFilesStore: ReceivedFilesStore
 ) : ViewModel() {
     val settings = settingsRepository.settingsFlow.stateIn(
         scope = viewModelScope,
@@ -70,6 +72,16 @@ class SettingsViewModel(
     fun setUploadFeatureActive(uploadFeatureActive: Boolean) {
         viewModelScope.launch {
             settingsRepository.setUploadFeatureActive(uploadFeatureActive)
+        }
+    }
+
+    fun clearReceivedHistory() {
+        receivedFilesStore.clearHistory()
+    }
+
+    fun resetSettings() {
+        viewModelScope.launch {
+            settingsRepository.resetToDefaults()
         }
     }
 }

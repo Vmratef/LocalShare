@@ -6,7 +6,23 @@ package com.defname.localshare.ui.screens.settings
 
 import com.defname.localshare.ui.components.ThemeToggleButton
 import androidx.compose.foundation.clickable
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings as AndroidSettings
+import android.widget.Toast
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import com.defname.localshare.ui.theme.ThemeController
+import com.defname.localshare.ui.theme.ThemeMode
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -55,6 +71,9 @@ fun SettingsScreen(
     val settings by viewModel.settings.collectAsState()
     val runtimeState by viewModel.runtimeState.collectAsState()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var confirmReset by remember { mutableStateOf(false) }
+    var confirmClearHistory by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -78,6 +97,29 @@ fun SettingsScreen(
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
         ) {
+            // Appearance
+            SettingsGroup(title = "Appearance") {
+                SettingsRow {
+                    Column(Modifier.weight(1f)) {
+                        Text("Theme", style = MaterialTheme.typography.bodyLarge)
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(
+                                ThemeMode.SYSTEM to "System",
+                                ThemeMode.LIGHT to "Light",
+                                ThemeMode.DARK to "Dark"
+                            ).forEach { (mode, label) ->
+                                FilterChip(
+                                    selected = ThemeController.mode == mode,
+                                    onClick = { ThemeController.set(context, mode) },
+                                    label = { Text(label) }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             // Gruppe 1: Server Konfiguration
             SettingsGroup(title = stringResource(R.string.settings_server_title)) {
                 // Port Einstellung
@@ -196,9 +238,117 @@ fun SettingsScreen(
                     onCheckedChange = viewModel::setUploadFeatureActive
                 )
             }
+
+            SettingsGroup(title = "Received files") {
+                SettingsRow {
+                    Column(Modifier.weight(1f)) {
+                        Text("Received files list", style = MaterialTheme.typography.bodyLarge)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Files sent to this device are saved in Downloads/LocalShare. Clearing the history only removes the \"from / when\" info, never the files.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(onClick = { confirmClearHistory = true }) {
+                            Text("Clear history")
+                        }
+                    }
+                }
+            }
+
+            SettingsGroup(title = "Keep the server running") {
+                SettingsRow {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "If sharing stops when the screen is off, allow LocalShare to run in the background.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = { openBatterySettings(context) }) { Text("Battery") }
+                            OutlinedButton(onClick = { openNotificationSettings(context) }) { Text("Notifications") }
+                            OutlinedButton(onClick = { openAppInfo(context) }) { Text("App info") }
+                        }
+                    }
+                }
+            }
+
+            SettingsGroup(title = "Reset") {
+                SettingsRow {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "Restore every setting to its default value.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(onClick = { confirmReset = true }) {
+                            Text("Reset all settings")
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
         }
     }
+
+    if (confirmReset) {
+        AlertDialog(
+            onDismissRequest = { confirmReset = false },
+            title = { Text("Reset all settings?") },
+            text = { Text("Port, security and web interface options go back to their defaults.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.resetSettings()
+                    confirmReset = false
+                }) { Text("Reset") }
+            },
+            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Cancel") } }
+        )
+    }
+
+    if (confirmClearHistory) {
+        AlertDialog(
+            onDismissRequest = { confirmClearHistory = false },
+            title = { Text("Clear history?") },
+            text = { Text("The received files stay on your device. Only the sender and date info is removed.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.clearReceivedHistory()
+                    confirmClearHistory = false
+                }) { Text("Clear") }
+            },
+            dismissButton = { TextButton(onClick = { confirmClearHistory = false }) { Text("Cancel") } }
+        )
+    }
 }
+
+private fun safeStart(context: Context, intent: Intent) {
+    try {
+        context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    } catch (e: Exception) {
+        Toast.makeText(context, "Not available on this device", Toast.LENGTH_SHORT).show()
+    }
+}
+
+private fun openBatterySettings(context: Context) =
+    safeStart(context, Intent(AndroidSettings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+
+private fun openNotificationSettings(context: Context) =
+    safeStart(
+        context,
+        Intent(AndroidSettings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(AndroidSettings.EXTRA_APP_PACKAGE, context.packageName)
+    )
+
+private fun openAppInfo(context: Context) =
+    safeStart(
+        context,
+        Intent(AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
+    )
 
 @Preview(showBackground = true)
 @Composable
