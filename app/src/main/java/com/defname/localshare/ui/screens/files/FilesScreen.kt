@@ -4,6 +4,7 @@
 
 package com.defname.localshare.ui.screens.files
 
+import com.defname.localshare.ui.components.ThemeToggleButton
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
@@ -85,6 +86,7 @@ fun FilesScreen(
                             Icon(Icons.Default.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error)
                         }
                     } else {
+                        ThemeToggleButton()
                         IconButton(onClick = { showAppsDialog = true }) {
                             Icon(Icons.Default.Android, contentDescription = "Share installed app")
                         }
