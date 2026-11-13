@@ -4,7 +4,15 @@
 
 @layer base {
   body {
-    @apply bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-gray-100 transition-colors duration-300;
+    @apply text-gray-900 dark:text-gray-100 transition-colors duration-300;
+    /* Glass look: colorful gradient behind translucent, blurred panels */
+    background: linear-gradient(135deg, #c7d2fe 0%, #e9d5ff 45%, #a5f3fc 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+  html.dark body {
+    background: linear-gradient(135deg, #0f172a 0%, #312e81 50%, #134e4a 100%);
+    background-attachment: fixed;
   }
 
   /* Custom scrollbar for a more modern look */
@@ -22,27 +30,27 @@
 @layer components {
   /* Layout & Main Containers */
   .ls-header {
-    @apply p-6 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between;
+    @apply p-6 bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl border-b border-white/40 dark:border-white/10 flex items-center justify-between;
   }
 
   .ls-toolbar {
-    @apply flex flex-wrap justify-between items-center mb-8 gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800;
+    @apply flex flex-wrap justify-between items-center mb-8 gap-4 bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl p-4 rounded-2xl shadow-lg border border-white/40 dark:border-white/10;
   }
 
   /* Buttons */
   .ls-btn-icon {
-    @apply p-2 rounded-lg bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors focus:outline-none cursor-pointer;
+    @apply p-2 rounded-lg bg-white/40 dark:bg-white/10 backdrop-blur-md hover:bg-white/60 dark:hover:bg-white/20 transition-colors focus:outline-none cursor-pointer;
   }
 
   .ls-btn-toolbar {
-    @apply p-2 bg-gray-100 dark:bg-slate-800 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700 transition cursor-pointer;
+    @apply p-2 bg-white/40 dark:bg-white/10 backdrop-blur-md rounded-lg hover:bg-white/60 dark:hover:bg-white/20 transition cursor-pointer;
   }
 
   .ls-btn-view-switcher {
     @apply p-2 rounded-lg font-medium cursor-pointer transition-colors;
   }
   .ls-btn-view-switcher.active {
-    @apply text-blue-600 bg-blue-50 dark:bg-blue-900/40;
+    @apply text-blue-700 bg-white/60 dark:text-blue-300 dark:bg-white/15;
   }
   .ls-btn-view-switcher.inactive {
     @apply text-gray-500 hover:text-gray-700 dark:hover:text-gray-300;
@@ -53,14 +61,14 @@
   }
 
   .ls-btn-secondary {
-    @apply bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700 transition cursor-pointer;
+    @apply bg-white/40 dark:bg-white/10 backdrop-blur-md text-gray-700 dark:text-gray-200 p-1.5 rounded-lg hover:bg-white/60 dark:hover:bg-white/20 transition cursor-pointer;
   }
 
   .ls-btn-action-small {
     @apply text-[10px] uppercase tracking-wider px-3 py-1.5 rounded-lg font-bold transition flex items-center justify-center gap-1;
   }
   .ls-btn-action-small.get {
-    @apply bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700;
+    @apply bg-white/40 dark:bg-white/10 text-gray-700 dark:text-gray-200 hover:bg-white/60 dark:hover:bg-white/20;
   }
   .ls-btn-action-small.open {
     @apply bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-500/10;
@@ -71,10 +79,10 @@
     @apply fixed inset-0 bg-gray-900/60 backdrop-blur-sm;
   }
   .ls-modal-container {
-    @apply relative bg-white dark:bg-slate-800 w-full max-w-md rounded-2xl shadow-2xl p-6 overflow-hidden;
+    @apply relative bg-white/70 dark:bg-slate-800/70 backdrop-blur-2xl border border-white/40 dark:border-white/10 w-full max-w-md rounded-2xl shadow-2xl p-6 overflow-hidden;
   }
   .ls-dropzone {
-    @apply border-2 border-dashed rounded-xl p-8 cursor-pointer bg-gray-50 dark:bg-slate-900/50 transition-colors;
+    @apply border-2 border-dashed rounded-xl p-8 cursor-pointer bg-white/30 dark:bg-white/5 transition-colors;
   }
   .ls-dropzone.active {
     @apply border-blue-500 bg-blue-50 dark:bg-blue-900/20;
@@ -85,22 +93,22 @@
 
   /* Form Elements */
   .ls-toolbar-select {
-    @apply bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-sm rounded-lg p-2 focus:ring-blue-500 dark:text-white;
+    @apply bg-white/50 dark:bg-slate-800/50 backdrop-blur-md border border-white/40 dark:border-white/10 text-sm rounded-lg p-2 focus:ring-blue-500 dark:text-white;
   }
 
   /* File Cards */
   .ls-card-grid {
-    @apply bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden flex flex-col;
+    @apply bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl rounded-2xl shadow-lg border border-white/40 dark:border-white/10 overflow-hidden flex flex-col;
   }
   .ls-card-list {
-    @apply bg-white dark:bg-slate-900 p-3 rounded-xl border border-gray-100 dark:border-slate-800 flex items-center justify-between shadow-sm gap-4;
+    @apply bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl p-3 rounded-xl border border-white/40 dark:border-white/10 flex items-center justify-between shadow-lg gap-4;
   }
 
   .ls-preview-box-grid {
-    @apply h-40 bg-gray-100 dark:bg-slate-800 flex items-center justify-center cursor-pointer overflow-hidden;
+    @apply h-40 bg-white/30 dark:bg-white/10 flex items-center justify-center cursor-pointer overflow-hidden;
   }
   .ls-preview-box-list {
-    @apply w-12 h-12 bg-gray-100 dark:bg-slate-800 rounded-lg flex-shrink-0 flex items-center justify-center cursor-pointer overflow-hidden;
+    @apply w-12 h-12 bg-white/30 dark:bg-white/10 rounded-lg flex-shrink-0 flex items-center justify-center cursor-pointer overflow-hidden;
   }
 
   .ls-card-content-grid {
@@ -122,7 +130,7 @@
 
   /* Progress Bars */
   .ls-progress-container {
-    @apply w-full bg-gray-100 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden;
+    @apply w-full bg-white/40 dark:bg-white/15 rounded-full h-1.5 overflow-hidden;
   }
   .ls-progress-bar {
     @apply h-full transition-all duration-300;
