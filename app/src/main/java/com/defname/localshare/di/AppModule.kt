@@ -14,6 +14,7 @@ import com.defname.localshare.data.MediaStoreStorageProvider
 import com.defname.localshare.data.NetworkInfoProvider
 import com.defname.localshare.data.PermissionRepository
 import com.defname.localshare.data.QrCodeProvider
+import com.defname.localshare.data.ReceivedFilesStore
 import com.defname.localshare.data.RemoteCommunicationRepository
 import com.defname.localshare.data.SecurityRepository
 import com.defname.localshare.data.ServerUrlProvider
@@ -72,6 +73,7 @@ val appModule = module {
 
     singleOf(::FeatureFlagsProvider)
 
+    singleOf(::ReceivedFilesStore)
     singleOf(::UploadRepository)
     singleOf(::MediaStoreStorageProvider) bind FileStorageProvider::class
     singleOf(::UploadManager)
@@ -88,10 +90,10 @@ val appModule = module {
     factory { ServerUrlProvider(get(), get())}
 
     viewModel { MainViewModel(get(), get(), get()) }
-    viewModel { FilesViewModel(get(), get()) }
+    viewModel { FilesViewModel(get(), get(), get()) }
     viewModel { HomeViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { LogsViewModel(get(), get(), get()) }
-    viewModel { SettingsViewModel(get(), get()) }
+    viewModel { SettingsViewModel(get(), get(), get()) }
     viewModelOf(::SharedContentViewModel)
     viewModelOf(::TransfersViewModel)
 }
