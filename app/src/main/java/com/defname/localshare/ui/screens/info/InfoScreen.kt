@@ -4,6 +4,7 @@
 
 package com.defname.localshare.ui.screens.info
 
+import com.defname.localshare.ui.components.ThemeToggleButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -89,6 +90,7 @@ fun InfoScreen(onOpenDrawer: () -> Unit) {
                         Icon(Icons.Default.Menu, contentDescription = null)
                     }
                 },
+                actions = { ThemeToggleButton() },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant
                 )
