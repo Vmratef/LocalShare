@@ -4,6 +4,7 @@
 
 package com.defname.localshare.ui.screens.logs
 
+import com.defname.localshare.ui.components.ThemeToggleButton
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -49,6 +50,7 @@ fun LogsScreen(
                     }
                 },
                 actions = {
+                    ThemeToggleButton()
                     IconButton(onClick = { viewModel.clearLogs() }) {
                         Icon(Icons.Default.DeleteSweep, contentDescription = "Clear logs")
                     }
