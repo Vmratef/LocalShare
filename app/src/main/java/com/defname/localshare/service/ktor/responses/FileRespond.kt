@@ -64,7 +64,7 @@ suspend fun ApplicationCall.sendFile(
                     // Wir öffnen den InputStream innerhalb des Writers
                     inputStream.use { input ->
                         try {
-                            val buffer = ByteArray(8192) // 8KB Buffer
+                            val buffer = ByteArray(256 * 1024) // 256KB buffer: far fewer loop iterations / ban checks per GB
                             var bytesRead: Int
 
                             while (input.read(buffer).also { bytesRead = it } != -1) {

@@ -42,6 +42,8 @@ suspend fun ApplicationCall.sendZip(
     ) {
         try {
             val zip = ZipOutputStream(this.toOutputStream())
+            // Photos/videos/archives are already compressed; deflate only costs CPU time.
+            zip.setLevel(java.util.zip.Deflater.NO_COMPRESSION)
 
             for (fileInfo in files) {
                 if (!securityHandler.mayContinueDownload(this@sendZip.request)) {
@@ -59,7 +61,7 @@ suspend fun ApplicationCall.sendZip(
 
                     inputStream.use { input ->
                         // 2. Manueller Buffer-Loop statt copyTo
-                        val buffer = ByteArray(8192)
+                        val buffer = ByteArray(256 * 1024)
                         var read: Int
                         while (input.read(buffer).also { read = it } != -1) {
                             // 3. Check während des Kopierens der aktuellen Datei
