@@ -4,7 +4,24 @@
 
 package com.defname.localshare.ui.screens.main
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.ListAlt
+import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
+import com.defname.localshare.ui.screens.main.components.BottomBarItem
+import com.defname.localshare.ui.screens.main.components.GlassBottomBar
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalNavigationDrawer
@@ -60,6 +77,27 @@ fun MainScreen(
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
+    val navigateTo: (String) -> Unit = { route ->
+        if (currentRoute != route) {
+            navController.navigate(route) {
+                popUpTo(navController.graph.startDestinationId) {
+                    saveState = true
+                }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
+
+    // Home / Files / Transfers live in the floating bottom bar, the rest stays in the side menu.
+    val bottomItems = listOf(
+        BottomBarItem(Screen.Main.route, "Home", Icons.Default.Home),
+        BottomBarItem(Screen.Files.route, "Files", Icons.Default.ListAlt),
+        BottomBarItem(Screen.Transfers.route, "Transfers", Icons.Default.SwapVert)
+    )
+    val bottomRoutes = bottomItems.map { it.route }.toSet()
+    val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+
     if (state.welcomeMessageVisible) {
         WelcomeOnboarding(
             onDismiss = { scope.launch { viewModel.onDismissWelcomeMessage(true) } },
@@ -71,19 +109,11 @@ fun MainScreen(
         drawerState = drawerState,
         drawerContent = {
             MainMenu(
-                drawerItems = state.navigationItems,
+                drawerItems = state.navigationItems.filter { it.route !in bottomRoutes },
                 onItemClick = { route ->
                     scope.launch {
                         drawerState.close()
-                        if (currentRoute != route) {
-                            navController.navigate(route) {
-                                popUpTo(navController.graph.startDestinationId) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        }
+                        navigateTo(route)
                     }
                 },
                 currentRoute = currentRoute ?: state.navigationItems.getOrNull(0)?.route ?: "",
@@ -106,10 +136,15 @@ fun MainScreen(
             scope.launch { drawerState.open() }
         }
 
+        Column(modifier = Modifier.fillMaxSize()) {
         NavHost(
             navController = navController,
             startDestination = Screen.Main.route,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                // the bottom bar handles the navigation-bar inset, so inner Scaffolds must not add it again
+                .consumeWindowInsets(WindowInsets.navigationBars)
         ) {
             composable(Screen.Main.route) {
                 HomeScreen(
@@ -155,6 +190,18 @@ fun MainScreen(
             composable(Screen.Info.route) {
                 InfoScreen(onOpenDrawer = onOpenDrawer)
             }
+        }
+
+        if (!keyboardOpen) {
+            GlassBottomBar(
+                items = bottomItems,
+                currentRoute = currentRoute,
+                onItemClick = navigateTo,
+                modifier = Modifier
+                    .navigationBarsPadding()
+                    .padding(start = 20.dp, end = 20.dp, bottom = 8.dp, top = 4.dp)
+            )
+        }
         }
     }
 }
