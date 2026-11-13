@@ -12,7 +12,9 @@ data class DraftUploadBatch(
 data class UploadBatch(
     val batchId: String,
     val clientIp: String,
-    val files: List<UploadFile>
+    val files: List<UploadFile>,
+    // true = the files only live in the app cache and are just relayed to other devices
+    val relayOnly: Boolean = false
 )
 
 data class UploadFile(
