@@ -23,4 +23,7 @@ interface SettingsRepository {
     suspend fun setShowWelcomeMessage(showWelcomeMessage: Boolean)
     suspend fun setRegenerateTokenAtAppStart(regenerateTokenAtAppStart: Boolean)
     suspend fun setUploadFeatureActive(uploadFeatureActive: Boolean)
+
+    /** Resets every setting to its default (the security token is kept). */
+    suspend fun resetToDefaults()
 }
