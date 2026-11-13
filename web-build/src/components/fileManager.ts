@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Alpine from 'alpinejs';
-import { FileInfo, WebEventAddFile, WebEventRemoveFile } from '../types';
+import { FileInfo, WebEventAddFile, WebEventIncomingFile, WebEventRemoveFile } from '../types';
 import { humanFileSize, getThumbnailUrl, getFileIconUrl, copyTextToClipboard } from '../utils';
 
 export const FileManager = (initialFiles: FileInfo[]) => ({
@@ -14,6 +14,7 @@ export const FileManager = (initialFiles: FileInfo[]) => ({
     sortAsc: true,
     copiedId: null as string | null,
     currentIndex: 0,
+    incoming: [] as (FileInfo & { from: string })[],
 
     init() {
         const sse = Alpine.store('sse') as EventSource;
@@ -31,6 +32,21 @@ export const FileManager = (initialFiles: FileInfo[]) => ({
             if (!this.files.find(f => f.fileId === newFile.fileId)) {
                 this.files.push(newFile);
             }
+        });
+
+        // A different device uploaded a file: offer it here (download or decline).
+        sse.addEventListener('incoming_file', (event: MessageEvent) => {
+            const data = JSON.parse(event.data) as WebEventIncomingFile;
+            if (this.incoming.find(f => f.fileId === data.id)) return;
+            this.incoming.push({
+                fileId: data.id,
+                filename: data.name,
+                size: data.size,
+                mimeType: data.mimeType,
+                icon: data.iconFile,
+                hasThumbnail: data.mimeType.startsWith('image/') || data.mimeType.startsWith('video/'),
+                from: data.from
+            });
         });
 
         sse.addEventListener('remove_file', (event: MessageEvent) => {
@@ -58,6 +74,29 @@ export const FileManager = (initialFiles: FileInfo[]) => ({
     prevSlide() { this.currentIndex = (this.currentIndex - 1 + this.sortedFiles.length) % this.sortedFiles.length; },
 
     humanFileSize(size: number) { return humanFileSize(size); },
+
+    incomingThumb(item: FileInfo) {
+        return item.hasThumbnail ? getThumbnailUrl(item.fileId) : getFileIconUrl(item.icon);
+    },
+
+    acceptIncoming(item: FileInfo & { from: string }) {
+        // start the download and keep the file in this device's list
+        const a = document.createElement('a');
+        a.href = `/${window.token}/file/${item.fileId}?download`;
+        a.download = item.filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        if (!this.files.find(f => f.fileId === item.fileId)) {
+            const { from, ...plain } = item;
+            this.files.push(plain);
+        }
+        this.dismissIncoming(item);
+    },
+
+    dismissIncoming(item: FileInfo) {
+        this.incoming = this.incoming.filter(f => f.fileId !== item.fileId);
+    },
 
     loadPreview(el: HTMLImageElement, file: FileInfo) {
         if (!file) return;
