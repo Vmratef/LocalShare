@@ -55,10 +55,11 @@ class TransfersViewModel(
         }
     }
 
-    fun onGrantUpload(uploadBatch: DraftUploadBatch) {
+    /** @param relayOnly true = do not save on this device, only pass it on to the other devices */
+    fun onGrantUpload(uploadBatch: DraftUploadBatch, relayOnly: Boolean = false) {
         viewModelScope.launch {
             try {
-                uploadManager.onRequestAccepted(uploadBatch.clientIp, uploadBatch.draftId)
+                uploadManager.onRequestAccepted(uploadBatch.clientIp, uploadBatch.draftId, relayOnly)
             } catch (e: Exception) {
                 android.util.Log.e("LocalShare", "Accepting upload failed", e)
             }
@@ -68,6 +69,16 @@ class TransfersViewModel(
     fun onDenyUpload(uploadBatch: DraftUploadBatch) {
         viewModelScope.launch {
             uploadManager.onRequestDenied(uploadBatch.clientIp, uploadBatch.draftId)
+        }
+    }
+
+    fun onSaveRelayBatch(batchId: String) {
+        viewModelScope.launch {
+            try {
+                uploadManager.saveRelayBatchToDevice(batchId)
+            } catch (e: Exception) {
+                android.util.Log.e("LocalShare", "Saving relayed files failed", e)
+            }
         }
     }
 }

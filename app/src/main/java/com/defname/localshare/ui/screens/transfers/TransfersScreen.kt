@@ -112,6 +112,7 @@ fun TransfersScreen(
                         DraftBatchCard(
                             item,
                             onGrant = { viewModel.onGrantUpload(item) },
+                            onRelay = { viewModel.onGrantUpload(item, relayOnly = true) },
                             onDeny = { viewModel.onDenyUpload(item) }
                         )
                     }
@@ -122,7 +123,7 @@ fun TransfersScreen(
                         SectionHeader("Active Transfers")
                     }
                     items(state.batches, key = { "active_${it.batchId}" }) { item ->
-                        ActiveBatchCard(item)
+                        ActiveBatchCard(item, onSaveToDevice = { viewModel.onSaveRelayBatch(item.batchId) })
                     }
                 }
             }
