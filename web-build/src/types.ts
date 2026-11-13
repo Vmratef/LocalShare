@@ -65,6 +65,16 @@ export interface WebEventAddFile extends BaseWebEvent {
     iconFile: string;
 }
 
+export interface WebEventIncomingFile extends BaseWebEvent {
+    type: 'incoming_file';
+    id: string;
+    name: string;
+    size: number;
+    mimeType: string;
+    iconFile: string;
+    from: string;
+}
+
 export interface WebEventRemoveFile extends BaseWebEvent {
     type: 'remove_file';
     id: string;
@@ -112,6 +122,7 @@ export interface WebEventUploadUpdated extends BaseWebEvent {
 export type WebEvent =
     | WebEventInit
     | WebEventAddFile
+    | WebEventIncomingFile
     | WebEventRemoveFile
     | WebEventAddText
     | WebEventRemoveText
