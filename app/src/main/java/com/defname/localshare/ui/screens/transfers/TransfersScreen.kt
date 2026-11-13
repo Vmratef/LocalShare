@@ -4,6 +4,7 @@
 
 package com.defname.localshare.ui.screens.transfers
 
+import com.defname.localshare.ui.components.ThemeToggleButton
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -56,6 +57,7 @@ fun TransfersScreen(
                         Icon(Icons.Default.Menu, contentDescription = null)
                     }
                 },
+                actions = { ThemeToggleButton() },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant
                 )
