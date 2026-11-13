@@ -48,6 +48,23 @@ class RemoteCommunicationRepository(
                 sendEvent(event to clientIp)
             }
         }
+        repositoryScope.launch {
+            uploadManager.receivedFileEvents.collect { (file, fromIp) ->
+                val event = EventEnvelop(
+                    event = WebEvent.IncomingFile(
+                        id = file.id,
+                        name = file.name,
+                        size = file.size,
+                        mimeType = file.mimeType,
+                        iconFile = file.iconFile,
+                        from = fromIp
+                    )
+                )
+                _clientEventFlows.forEach { (ip, flow) ->
+                    if (ip != fromIp) flow.tryEmit(event)
+                }
+            }
+        }
     }
 
     fun getStreamForClient(remoteIp: String): Flow<EventEnvelop> {

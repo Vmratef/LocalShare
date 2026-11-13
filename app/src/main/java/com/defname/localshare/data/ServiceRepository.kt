@@ -53,6 +53,17 @@ class ServiceRepository(
             initialValue = emptyList()
         )
 
+    // Files received from other devices. Kept apart from the shared list: they are only
+    // offered to the other devices, which can accept (download) or decline them.
+    private val _receivedFiles = MutableStateFlow<List<FileInfo>>(emptyList())
+    val receivedFiles = _receivedFiles.asStateFlow()
+
+    fun addReceivedFile(file: FileInfo) {
+        _receivedFiles.update { list ->
+            if (list.any { it.id == file.id }) list else list + file
+        }
+    }
+
     fun addFile(file: FileInfo) {
         _runtimeState.update { state ->
             if (state.fileList.any { it.uri == file.uri }) {
