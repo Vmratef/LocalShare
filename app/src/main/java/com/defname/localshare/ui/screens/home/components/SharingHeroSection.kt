@@ -33,6 +33,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import com.defname.localshare.ui.components.GlassCard
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -283,19 +285,9 @@ fun SharingHeroSection(
         }
     }
     else {
-        Card(
+        GlassCard(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = if (isRunning) MaterialTheme.colorScheme.primaryContainer
-                else MaterialTheme.colorScheme.surfaceVariant
-            ),
-            elevation = CardDefaults.cardElevation(
-                defaultElevation = if (isRunning) 4.dp else 0.dp
-            ),
-            border = if (!isRunning) BorderStroke(
-                1.dp,
-                MaterialTheme.colorScheme.outlineVariant
-            ) else null
+            tint = if (isRunning) MaterialTheme.colorScheme.primary else Color.Unspecified
         ) {
             Column(
                 modifier = Modifier.padding(24.dp),
