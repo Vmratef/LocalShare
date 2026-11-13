@@ -4,6 +4,7 @@
 
 package com.defname.localshare.ui.screens.home
 
+import com.defname.localshare.ui.components.ThemeToggleButton
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -113,7 +114,7 @@ fun HomeScreen(
                         Icon(Icons.Default.Menu, contentDescription = null)
                     }
                 },
-                actions = { },
+                actions = { ThemeToggleButton() },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant
                 )
