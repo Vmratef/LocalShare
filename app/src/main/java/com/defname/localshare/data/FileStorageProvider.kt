@@ -21,6 +21,12 @@ interface FileStorageProvider {
     fun openOutputStream(uri: Uri): OutputStream?
     suspend fun deleteFile(uri: Uri)
     suspend fun finalizeFile(uri: Uri)
+
+    /** Temporary file in the app's private cache: NOT visible in Downloads/Gallery. */
+    suspend fun createRelayFile(fileName: String): Uri?
+
+    /** Copies the content of [from] into [to]. */
+    suspend fun copyFile(from: Uri, to: Uri): Boolean
 }
 
 class MediaStoreStorageProvider(
@@ -29,6 +35,34 @@ class MediaStoreStorageProvider(
 
     private val contentResolver: ContentResolver
         get() = context.contentResolver
+
+    init {
+        // relay files only live as long as the app process (the offer list is in memory too)
+        try { File(context.cacheDir, "relay").deleteRecursively() } catch (_: Exception) { }
+    }
+
+    override suspend fun createRelayFile(fileName: String): Uri? = withContext(Dispatchers.IO) {
+        try {
+            val dir = File(File(context.cacheDir, "relay"), java.util.UUID.randomUUID().toString().take(8))
+            if (!dir.exists() && !dir.mkdirs()) return@withContext null
+            val file = File(dir, safeName(fileName))
+            if (!file.createNewFile()) return@withContext null
+            Uri.fromFile(file)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    override suspend fun copyFile(from: Uri, to: Uri): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val input = contentResolver.openInputStream(from) ?: return@withContext false
+            val output = contentResolver.openOutputStream(to) ?: run { input.close(); return@withContext false }
+            input.use { i -> output.use { o -> i.copyTo(o, 64 * 1024) } }
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
 
     private fun safeName(name: String): String {
         val cleaned = name

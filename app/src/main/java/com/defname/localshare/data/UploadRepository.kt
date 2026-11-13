@@ -12,13 +12,14 @@ class UploadRepository {
     private val _batches = MutableStateFlow<Map<String, UploadBatch>>(emptyMap())
     val batches = _batches.asStateFlow()
 
-    fun initNewUploadBatch(batchId: String, draft: DraftUploadBatch, fileUris: Map<String, Uri>) {
+    fun initNewUploadBatch(batchId: String, draft: DraftUploadBatch, fileUris: Map<String, Uri>, relayOnly: Boolean = false) {
         val newBatch = UploadBatch(
             batchId = batchId,
             clientIp = draft.clientIp,
             files = draft.files.map { file ->
                 file.copy(state = UploadFileState.Pending, uri = fileUris[file.checksum])
-            }
+            },
+            relayOnly = relayOnly
         )
         _batches.update { it + (batchId to newBatch) }
     }

@@ -71,4 +71,12 @@ class DataStoreSettingsRepository(
     override suspend fun setShowWelcomeMessage(showWelcomeMessage: Boolean) { store.edit { it[Keys.SHOW_WELCOME_MESSAGE] = showWelcomeMessage } }
     override suspend fun setRegenerateTokenAtAppStart(regenerateTokenAtAppStart: Boolean) { store.edit { it[Keys.REGENERATE_TOKEN_AT_APP_START] = regenerateTokenAtAppStart } }
     override suspend fun setUploadFeatureActive(uploadFeatureActive: Boolean) { store.edit { it[Keys.UPLOAD_FEATURE_ACTIVE] = uploadFeatureActive } }
+
+    override suspend fun resetToDefaults() {
+        store.edit { prefs ->
+            val token = prefs[Keys.TOKEN]
+            prefs.clear()
+            if (token != null) prefs[Keys.TOKEN] = token
+        }
+    }
 }
