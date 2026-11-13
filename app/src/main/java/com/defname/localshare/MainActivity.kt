@@ -12,8 +12,10 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.DisposableEffect
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -23,6 +25,7 @@ import com.defname.localshare.domain.repository.SettingsRepository
 import com.defname.localshare.domain.usecase.AddFilesUseCase
 import com.defname.localshare.domain.usecase.AddSharedContentUseCase
 import com.defname.localshare.ui.screens.main.MainScreen
+import com.defname.localshare.ui.theme.LocalDarkTheme
 import com.defname.localshare.ui.theme.LocalShareTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -53,6 +56,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
+        com.defname.localshare.ui.theme.ThemeController.init(this)
 
         super.onCreate(savedInstanceState)
 
@@ -89,6 +93,21 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             LocalShareTheme {
+                // keep status/navigation bar icons readable when the in-app theme differs from the system one
+                val dark = LocalDarkTheme.current
+                DisposableEffect(dark) {
+                    enableEdgeToEdge(
+                        statusBarStyle = SystemBarStyle.auto(
+                            android.graphics.Color.TRANSPARENT,
+                            android.graphics.Color.TRANSPARENT
+                        ) { dark },
+                        navigationBarStyle = SystemBarStyle.auto(
+                            android.graphics.Color.TRANSPARENT,
+                            android.graphics.Color.TRANSPARENT
+                        ) { dark }
+                    )
+                    onDispose { }
+                }
                 MainScreen(mainViewModel)
             }
         }
