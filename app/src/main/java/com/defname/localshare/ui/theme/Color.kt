@@ -1,23 +1,28 @@
-// SPDX-FileCopyrightText: 2026 2026 defname
-//
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 package com.defname.localshare.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+// Light palette
+val BrandIvory = Color(0xFFFFFDF0)
+val BrandPaper = Color(0xFFFBFAF2)
+val BrandMist = Color(0xFFEFEFEF)
+val BrandCool = Color(0xFFF2F6FC)
+val BrandPeach = Color(0xFFFFF5EE)
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+// Brand accents
+val BrandRed = Color(0xFFCB3534)
+val BrandRedDeep = Color(0xFF991613)
+val BrandBlue = Color(0xFF3A6EA5)
+val BrandGreen = Color(0xFFADC178)
+val BrandGold = Color(0xFFE49B0F)
+val BrandPink = Color(0xFFFF85A2)
+val BrandNight = Color(0xFF0B1215)
+val BrandYellow = Color(0xFFFFFD74)
 
-// Pending / Warning Colors (Amber)
-val Amber80 = Color(0xFFFFD54F)
-val Amber40 = Color(0xFFFFB300)
-val AmberContainerLight = Color(0xFFFFF8E1)
-val OnAmberContainerLight = Color(0xFF261900)
-val AmberContainerDark = Color(0xFF523D00)
-val OnAmberContainerDark = Color(0xFFFFE082)
+// Pending / Warning
+val Amber80 = Color(0xFFFFD979)
+val Amber40 = BrandGold
+val AmberContainerLight = Color(0xFFFFF2D5)
+val OnAmberContainerLight = Color(0xFF513400)
+val AmberContainerDark = Color(0xFF4B3510)
+val OnAmberContainerDark = Color(0xFFFFE6A8)
