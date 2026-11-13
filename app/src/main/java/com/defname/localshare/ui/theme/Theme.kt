@@ -76,6 +76,14 @@ private val LightColorScheme = lightColorScheme(
     onErrorContainer = Color(0xFF410002)
 )
 
+/** The colorful gradient behind all the glass surfaces (also used by the side menu). */
+fun glassBackgroundBrush(dark: Boolean): Brush =
+    if (dark) {
+        Brush.linearGradient(listOf(Color(0xFF0B1020), Color(0xFF2A2470), Color(0xFF0F4C5C)))
+    } else {
+        Brush.linearGradient(listOf(Color(0xFFC7D2FE), Color(0xFFE9D5FF), Color(0xFFA5F3FC)))
+    }
+
 @Composable
 fun LocalShareTheme(
     // null = follow the in-app toggle (ThemeController), which itself defaults to the system
@@ -103,11 +111,7 @@ fun LocalShareTheme(
     // Glass look: a colorful gradient behind translucent surfaces.
     val glass = if (isDark) 0.55f else 0.62f
     val glassStrong = 0.95f // dialogs / menus stay readable
-    val glassBackground = if (isDark) {
-        Brush.linearGradient(listOf(Color(0xFF0B1020), Color(0xFF2A2470), Color(0xFF0F4C5C)))
-    } else {
-        Brush.linearGradient(listOf(Color(0xFFC7D2FE), Color(0xFFE9D5FF), Color(0xFFA5F3FC)))
-    }
+    val glassBackground = glassBackgroundBrush(isDark)
 
     CompositionLocalProvider(LocalDarkTheme provides isDark) {
         MaterialTheme(
