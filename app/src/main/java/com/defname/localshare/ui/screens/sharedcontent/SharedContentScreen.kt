@@ -4,6 +4,7 @@
 
 package com.defname.localshare.ui.screens.sharedcontent
 
+import com.defname.localshare.ui.components.ThemeToggleButton
 import android.content.Context
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -105,7 +106,7 @@ fun SharedContentScreen(
                             Icon(Icons.Default.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error)
                         }
                     } else {
-
+                        ThemeToggleButton()
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
