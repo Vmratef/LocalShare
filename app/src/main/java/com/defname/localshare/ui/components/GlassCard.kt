@@ -16,6 +16,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 import com.defname.localshare.ui.theme.LocalDarkTheme
+import com.defname.localshare.ui.theme.PaletteIvory
+import com.defname.localshare.ui.theme.PaletteMist
 
 /**
  * iOS-style frosted glass card: soft white gradient fill + bright rim light.
@@ -30,12 +32,12 @@ fun GlassCard(
 ) {
     val dark = LocalDarkTheme.current
     val fill = Brush.linearGradient(
-        if (dark) listOf(Color.White.copy(alpha = 0.18f), Color.White.copy(alpha = 0.06f))
-        else listOf(Color.White.copy(alpha = 0.72f), Color.White.copy(alpha = 0.34f))
+        if (dark) listOf(PaletteMist.copy(alpha = 0.16f), PaletteMist.copy(alpha = 0.05f))
+        else listOf(PaletteIvory.copy(alpha = 0.78f), PaletteIvory.copy(alpha = 0.36f))
     )
     val rim = Brush.linearGradient(
-        if (dark) listOf(Color.White.copy(alpha = 0.40f), Color.White.copy(alpha = 0.07f))
-        else listOf(Color.White.copy(alpha = 0.98f), Color.White.copy(alpha = 0.35f))
+        if (dark) listOf(PaletteMist.copy(alpha = 0.38f), PaletteMist.copy(alpha = 0.06f))
+        else listOf(Color.White.copy(alpha = 0.98f), PaletteIvory.copy(alpha = 0.40f))
     )
 
     Surface(
