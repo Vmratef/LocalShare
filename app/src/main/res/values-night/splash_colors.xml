@@ -1,1 +1,5 @@
-
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- splash screen background in dark mode (palette: ink) -->
+    <color name="splash_background">#0B1215</color>
+</resources>
