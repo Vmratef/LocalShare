@@ -38,7 +38,7 @@ class MediaStoreStorageProvider(
 
     init {
         // relay files only live as long as the app process (the offer list is in memory too)
-        try { File(context.cacheDir, "relay").deleteRecursively() } catch (_: Exception) { }
+        Thread { try { File(context.cacheDir, "relay").deleteRecursively() } catch (_: Exception) { } }.start()
     }
 
     override suspend fun createRelayFile(fileName: String): Uri? = withContext(Dispatchers.IO) {
