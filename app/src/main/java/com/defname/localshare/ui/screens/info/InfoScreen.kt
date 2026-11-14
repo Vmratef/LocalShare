@@ -70,7 +70,7 @@ fun InfoScreen(onOpenDrawer: () -> Unit) {
 
     val appName = stringResource(id = R.string.app_name)
     val appIcon = remember {
-        ContextCompat.getDrawable(context, R.drawable.ic_launcher_foreground)
+        ContextCompat.getDrawable(context, R.drawable.ic_logo_glass)
     }
 
     val versionName = BuildConfig.VERSION_NAME
