@@ -22,6 +22,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import com.defname.localshare.ui.screens.files.components.ReceivedFileList
 import com.defname.localshare.ui.theme.LocalDarkTheme
+import com.defname.localshare.ui.theme.PaletteIvory
+import com.defname.localshare.ui.theme.PaletteMist
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -171,8 +173,8 @@ fun FilesScreen(
 @Composable
 private fun FilesTabs(selected: Int, onSelect: (Int) -> Unit) {
     val dark = LocalDarkTheme.current
-    val trackColor = if (dark) Color.White.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.55f)
-    val activeColor = if (dark) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.95f)
+    val trackColor = if (dark) PaletteMist.copy(alpha = 0.10f) else PaletteIvory.copy(alpha = 0.60f)
+    val activeColor = if (dark) PaletteMist.copy(alpha = 0.22f) else PaletteIvory
     val labels = listOf("Received", "Shared")
 
     Row(
