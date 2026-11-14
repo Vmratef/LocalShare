@@ -5,10 +5,10 @@
 
     <style name="Theme.App.Starting" parent="Theme.SplashScreen">
         <!-- Hintergrundfarbe (passt sich automatisch an, wenn du @color/background nutzt) -->
-        <item name="windowSplashScreenBackground">?android:attr/colorBackground</item>
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
 
         <!-- Dein Icon (Vordergrund) -->
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
 
         <!-- Dauer der Anzeige -->
         <item name="windowSplashScreenAnimationDuration">1000</item>
