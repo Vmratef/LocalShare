@@ -30,6 +30,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.defname.localshare.ui.theme.LocalDarkTheme
+import com.defname.localshare.ui.theme.PaletteInk
+import com.defname.localshare.ui.theme.PaletteIvory
+import com.defname.localshare.ui.theme.PaletteMist
 
 data class BottomBarItem(
     val route: String,
@@ -48,10 +51,10 @@ fun GlassBottomBar(
     modifier: Modifier = Modifier
 ) {
     val dark = LocalDarkTheme.current
-    val glassColor = if (dark) Color(0xFF2C2C2E).copy(alpha = 0.78f) else Color.White.copy(alpha = 0.68f)
+    val glassColor = if (dark) PaletteInk.copy(alpha = 0.55f) else PaletteIvory.copy(alpha = 0.72f)
     val borderBrush = Brush.verticalGradient(
-        if (dark) listOf(Color.White.copy(alpha = 0.28f), Color.White.copy(alpha = 0.06f))
-        else listOf(Color.White.copy(alpha = 0.95f), Color.White.copy(alpha = 0.35f))
+        if (dark) listOf(PaletteMist.copy(alpha = 0.30f), PaletteMist.copy(alpha = 0.06f))
+        else listOf(Color.White.copy(alpha = 0.95f), PaletteIvory.copy(alpha = 0.40f))
     )
 
     Surface(

@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import com.defname.localshare.R
 import com.defname.localshare.ui.screens.main.NavigationItem
 import com.defname.localshare.ui.theme.LocalDarkTheme
+import com.defname.localshare.ui.theme.PaletteIvory
+import com.defname.localshare.ui.theme.PaletteMist
 import com.defname.localshare.ui.theme.glassBackgroundBrush
 
 @Composable
@@ -58,7 +60,7 @@ fun MainMenu(
         if (dark) listOf(Color.White.copy(alpha = 0.35f), Color.White.copy(alpha = 0.05f))
         else listOf(Color.White.copy(alpha = 0.95f), Color.White.copy(alpha = 0.30f))
     )
-    val itemGlass = if (dark) Color.White.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.62f)
+    val itemGlass = if (dark) PaletteMist.copy(alpha = 0.16f) else PaletteIvory.copy(alpha = 0.70f)
 
     ModalDrawerSheet(
         modifier = Modifier.fillMaxWidth(0.78f),
