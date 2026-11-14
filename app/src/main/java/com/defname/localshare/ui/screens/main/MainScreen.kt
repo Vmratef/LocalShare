@@ -4,7 +4,13 @@
 
 package com.defname.localshare.ui.screens.main
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -105,16 +111,20 @@ fun MainScreen(
         )
     }
 
+    // swipe left/right = next/previous tab. The side menu opens with the menu button only
+    // (swiping stays possible while it is open, to close it).
+    val swipeThresholdPx = with(LocalDensity.current) { 72.dp.toPx() }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
+        gesturesEnabled = drawerState.isOpen,
         drawerContent = {
             MainMenu(
                 drawerItems = state.navigationItems.filter { it.route !in bottomRoutes },
                 onItemClick = { route ->
-                    scope.launch {
-                        drawerState.close()
-                        navigateTo(route)
-                    }
+                    // navigate right away, the menu slides out at the same time
+                    navigateTo(route)
+                    scope.launch { drawerState.close() }
                 },
                 currentRoute = currentRoute ?: state.navigationItems.getOrNull(0)?.route ?: "",
                 onHelpClick = {
@@ -137,14 +147,42 @@ fun MainScreen(
         }
 
         Column(modifier = Modifier.fillMaxSize()) {
-        NavHost(
-            navController = navController,
-            startDestination = Screen.Main.route,
+        Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
                 // the bottom bar handles the navigation-bar inset, so inner Scaffolds must not add it again
                 .consumeWindowInsets(WindowInsets.navigationBars)
+                .pointerInput(currentRoute) {
+                    val index = bottomItems.indexOfFirst { it.route == currentRoute }
+                    if (index < 0) return@pointerInput
+                    var total = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = { total = 0f },
+                        onHorizontalDrag = { change, dragAmount ->
+                            total += dragAmount
+                            if (kotlin.math.abs(total) > 0f) change.consume()
+                        },
+                        onDragEnd = {
+                            val target = when {
+                                total < -swipeThresholdPx -> index + 1
+                                total > swipeThresholdPx -> index - 1
+                                else -> -1
+                            }
+                            bottomItems.getOrNull(target)?.let { navigateTo(it.route) }
+                        }
+                    )
+                }
+        ) {
+        NavHost(
+            navController = navController,
+            startDestination = Screen.Main.route,
+            modifier = Modifier.fillMaxSize(),
+            // Quick tab switches (the default is a slow 700 ms cross-fade that shows two glass screens on top of each other)
+            enterTransition = { fadeIn(tween(130)) },
+            exitTransition = { fadeOut(tween(80)) },
+            popEnterTransition = { fadeIn(tween(130)) },
+            popExitTransition = { fadeOut(tween(80)) }
         ) {
             composable(Screen.Main.route) {
                 HomeScreen(
@@ -190,6 +228,7 @@ fun MainScreen(
             composable(Screen.Info.route) {
                 InfoScreen(onOpenDrawer = onOpenDrawer)
             }
+        }
         }
 
         if (!keyboardOpen) {
