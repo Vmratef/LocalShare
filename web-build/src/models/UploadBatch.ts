@@ -110,24 +110,42 @@ export class UploadBatch {
     async addFile(file: File, onProgress?: (fraction: number) => void) {
         if (this.state !== UploadBatchState.DRAFT) return;
 
-        const checksum = await this.calculateChecksum(file, onProgress);
-        if (this.files.some(f => f.checksum === checksum)) return;
-
         const mime = file.type || 'application/octet-stream';
         const previewUrl = (mime.startsWith('image/') || mime.startsWith('video/'))
             ? URL.createObjectURL(file)
             : undefined;
 
-        this.files.push({
-            checksum: checksum,
+        // Add the file to the reactive list BEFORE hashing. Large files can take
+        // minutes to hash; the user should see the file immediately, not an empty
+        // dropzone that looks as if the drop was ignored.
+        const pendingFile: UploadFile = {
+            checksum: `pending-${this.draftId}-${Date.now()}-${this.files.length}`,
             file: file,
             previewUrl: previewUrl,
             name: file.name,
-            mimeType: file.type || 'application/octet-stream',
+            mimeType: mime,
             size: file.size,
             state: UploadFileState.PENDING,
             progress: 0
-        });
+        };
+        this.files.push(pendingFile);
+
+        try {
+            const checksum = await this.calculateChecksum(file, onProgress);
+            // Hashing may take a while; check duplicates only after the real hash
+            // is available, then replace the temporary identifier in-place.
+            if (this.files.some(existing => existing !== pendingFile && existing.checksum === checksum)) {
+                if (pendingFile.previewUrl) URL.revokeObjectURL(pendingFile.previewUrl);
+                this.files = this.files.filter(existing => existing !== pendingFile);
+                return;
+            }
+            pendingFile.checksum = checksum;
+            this.files = [...this.files];
+        } catch (error) {
+            if (pendingFile.previewUrl) URL.revokeObjectURL(pendingFile.previewUrl);
+            this.files = this.files.filter(existing => existing !== pendingFile);
+            throw error;
+        }
     }
 
     removeFile(checksum: string) {
