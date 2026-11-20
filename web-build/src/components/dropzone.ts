@@ -11,11 +11,9 @@ export const Dropzone = () => ({
     dragActive: false,
     trigger: 0,
 
-    // Set while files are being read/hashed (can take a while for large files).
-    // Can be used in the template, e.g. x-show="isProcessing" / x-text="processingName".
     isProcessing: false,
     processingName: '',
-    processingProgress: 0, // 0..1
+    processingProgress: 0,
 
     get isUploading(): boolean {
         return this.activeBatch?.state === UploadBatchState.UPLOADING;
@@ -39,35 +37,16 @@ export const Dropzone = () => ({
     async handleFiles(fileList: FileList | File[]) {
         if (!this.activeBatch) this.createNewBatch();
 
-        // Copy first: a FileList from a drop event must be read synchronously.
+        // File metadata and a local upload key are enough to request approval.
+        // No file bytes are read until the receiver approves and transfer begins.
         const files = Array.from(fileList);
-        const failed: string[] = [];
-
-        this.isProcessing = true;
-        try {
-            for (const file of files) {
-                this.processingName = file.name;
-                this.processingProgress = 0;
-
-                try {
-                    await this.activeBatch!.addFile(file, (fraction: number) => {
-                        this.processingProgress = fraction;
-                    });
-                } catch (err) {
-                    // One bad file (too big for the browser, a dropped folder, ...)
-                    // must not break the whole drop.
-                    console.error(`Could not add file "${file.name}":`, err);
-                    failed.push(file.name);
-                }
+        for (const file of files) {
+            try {
+                await this.activeBatch!.addFile(file);
+            } catch (err) {
+                console.error(`Could not add file "${file.name}":`, err);
+                alert(`Could not add file: ${file.name}`);
             }
-        } finally {
-            this.isProcessing = false;
-            this.processingName = '';
-            this.processingProgress = 0;
-        }
-
-        if (failed.length > 0) {
-            alert(`These files could not be read and were skipped:\n${failed.join('\n')}`);
         }
     },
 
