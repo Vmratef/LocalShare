@@ -21,7 +21,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import java.io.InputStream
-import java.security.MessageDigest
 
 class UploadManager(
     private val uploadRepository: UploadRepository,
@@ -145,8 +144,6 @@ class UploadManager(
         try {
             uploadRepository.updateFileState(batchId, fileHash, UploadFileState.Uploading(0))
 
-            val digest = MessageDigest.getInstance("SHA-256")
-
             // Blocking file/network I/O runs on the IO pool, so several devices can upload at the
             // same time without starving the server's request threads.
             withContext(Dispatchers.IO) {
@@ -159,7 +156,6 @@ class UploadManager(
                     while (true) {
                         bytesRead = inputStream.read(buffer)
                         if (bytesRead == -1) break
-                        digest.update(buffer, 0, bytesRead)
                         out.write(buffer, 0, bytesRead)
                         totalBytesRead += bytesRead
 
@@ -182,41 +178,33 @@ class UploadManager(
                 }
             }
 
-            val actualHash = digest.digest().joinToString("") { "%02x".format(it) }
-            
-            if (actualHash.equals(fileHash, ignoreCase = true)) {
-                if (!batch.relayOnly) {
-                    fileStorageProvider.finalizeFile(uri)
-                    receivedFilesStore.record(uri, file.name, file.size, clientIp)
-                }
-                uploadRepository.updateFileState(batchId, fileHash, UploadFileState.Finished)
-
-                // Offer the received file to the OTHER connected devices (they can accept or decline).
-                val sharedMime = file.mimeType.ifBlank { "application/octet-stream" }
-                val receivedInfo = FileInfo(
-                    id = Integer.toHexString(uri.toString().hashCode()).lowercase(),
-                    uri = uri,
-                    name = file.name,
-                    size = file.size,
-                    mimeType = sharedMime,
-                    iconFile = IconMap.getIcon(sharedMime)
-                )
-                serviceRepository.addReceivedFile(receivedInfo)
-                _receivedFileEvents.emit(receivedInfo to clientIp)
-
-                val event = EventEnvelop(
-                    event = WebEvent.UploadUpdated(
-                        id = batchId,
-                        fileChecksum = fileHash,
-                        status = UploadStatus.FINISHED
-                    )
-                )
-                _uploadEvents.emit(event to clientIp)
-            } else {
-                fileStorageProvider.deleteFile(uri)
-                uploadRepository.updateFileState(batchId, fileHash, UploadFileState.Error)
-                emitFileError(clientIp, batchId, fileHash, "Checksum mismatch! File corrupted.")
+            if (!batch.relayOnly) {
+                fileStorageProvider.finalizeFile(uri)
+                receivedFilesStore.record(uri, file.name, file.size, clientIp)
             }
+            uploadRepository.updateFileState(batchId, fileHash, UploadFileState.Finished)
+
+            // Offer the received file to the OTHER connected devices (they can accept or decline).
+            val sharedMime = file.mimeType.ifBlank { "application/octet-stream" }
+            val receivedInfo = FileInfo(
+                id = Integer.toHexString(uri.toString().hashCode()).lowercase(),
+                uri = uri,
+                name = file.name,
+                size = file.size,
+                mimeType = sharedMime,
+                iconFile = IconMap.getIcon(sharedMime)
+            )
+            serviceRepository.addReceivedFile(receivedInfo)
+            _receivedFileEvents.emit(receivedInfo to clientIp)
+
+            val event = EventEnvelop(
+                event = WebEvent.UploadUpdated(
+                    id = batchId,
+                    fileChecksum = fileHash,
+                    status = UploadStatus.FINISHED
+                )
+            )
+            _uploadEvents.emit(event to clientIp)
         } catch (e: Exception) {
             fileStorageProvider.deleteFile(uri)
             uploadRepository.updateFileState(batchId, fileHash, UploadFileState.Error)
