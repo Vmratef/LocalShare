@@ -4,7 +4,6 @@
 
 
 import Alpine from 'alpinejs';
-import { sha256 } from 'js-sha256';
 import { 
     UploadFile, 
     UploadFileState, 
@@ -41,7 +40,6 @@ export class UploadBatch {
     draftId: number;
     id?: string;
     private abortController?: AbortController;
-    private hashingControllers = new Map<UploadFile, AbortController>();
 
     private handlers = {
         accepted: (e: MessageEvent) => {
@@ -79,39 +77,7 @@ export class UploadBatch {
         this.sse.removeEventListener('upload_updated', this.handlers.updated);
     }
 
-    /**
-     * Calculates the SHA-256 of a file incrementally.
-     *
-     * The old implementation called `file.arrayBuffer()`, which loads the WHOLE file
-     * into memory. For large files that fails (out of memory / buffer too big), the
-     * promise rejects, and the file never shows up in the list.
-     *
-     * Here the file is read in small slices, so memory stays low and the browser
-     * stays responsive. The resulting hex string is identical to the old one, so the
-     * server-side checksum verification keeps working unchanged.
-     */
-    async calculateChecksum(file: File, onProgress?: (fraction: number) => void, signal?: AbortSignal): Promise<string> {
-        const hasher = sha256.create();
-
-        for (let offset = 0; offset < file.size; offset += HASH_CHUNK_SIZE) {
-            if (signal?.aborted) throw new DOMException('Hashing canceled', 'AbortError');
-            const end = Math.min(offset + HASH_CHUNK_SIZE, file.size);
-            const chunk = await file.slice(offset, end).arrayBuffer();
-            if (signal?.aborted) throw new DOMException('Hashing canceled', 'AbortError');
-            hasher.update(chunk);
-
-            onProgress?.(end / file.size);
-
-            // Give the browser a chance to repaint / handle events between chunks.
-            await new Promise<void>(resolve => setTimeout(resolve, 0));
-        }
-
-        if (signal?.aborted) throw new DOMException('Hashing canceled', 'AbortError');
-        onProgress?.(1);
-        return hasher.hex();
-    }
-
-    async addFile(file: File, onProgress?: (fraction: number) => void) {
+    async addFile(file: File) {
         if (this.state !== UploadBatchState.DRAFT) return;
 
         const mime = file.type || 'application/octet-stream';
@@ -119,13 +85,22 @@ export class UploadBatch {
             ? URL.createObjectURL(file)
             : undefined;
 
-        // Add the file to the reactive list BEFORE hashing. Large files can take
-        // minutes to hash; the user should see the file immediately, not an empty
-        // dropzone that looks as if the drop was ignored.
+        // This is an opaque per-file upload key, not a content checksum.
+        // The server streams and stores the file without requiring a pre-upload hash.
+        const randomPart = () => {
+            if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+                const bytes = new Uint8Array(16);
+                crypto.getRandomValues(bytes);
+                return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+            }
+            return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+        };
+
+        const uploadKey = randomPart();
         const pendingFile: UploadFile = {
-            checksum: `pending-${this.draftId}-${Date.now()}-${this.files.length}`,
-            file: file,
-            previewUrl: previewUrl,
+            checksum: uploadKey,
+            file,
+            previewUrl,
             name: file.name,
             mimeType: mime,
             size: file.size,
@@ -133,35 +108,11 @@ export class UploadBatch {
             progress: 0
         };
         this.files.push(pendingFile);
-        const hashingController = new AbortController();
-        this.hashingControllers.set(pendingFile, hashingController);
-
-        try {
-            const checksum = await this.calculateChecksum(file, onProgress, hashingController.signal);
-            // Hashing may take a while; check duplicates only after the real hash
-            // is available, then replace the temporary identifier in-place.
-            if (this.files.some(existing => existing !== pendingFile && existing.checksum === checksum)) {
-                if (pendingFile.previewUrl) URL.revokeObjectURL(pendingFile.previewUrl);
-                this.files = this.files.filter(existing => existing !== pendingFile);
-                return;
-            }
-            pendingFile.checksum = checksum;
-            this.files = [...this.files];
-        } catch (error) {
-            if (pendingFile.previewUrl) URL.revokeObjectURL(pendingFile.previewUrl);
-            this.files = this.files.filter(existing => existing !== pendingFile);
-            if ((error as any)?.name !== 'AbortError') throw error;
-        } finally {
-            this.hashingControllers.delete(pendingFile);
-        }
+        this.files = [...this.files];
     }
 
     removeFile(checksum: string) {
         const removed = this.files.find(f => f.checksum === checksum);
-        if (removed) {
-            this.hashingControllers.get(removed)?.abort();
-            this.hashingControllers.delete(removed);
-        }
         if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl);
         this.files = this.files.filter(f => f.checksum !== checksum);
     }
