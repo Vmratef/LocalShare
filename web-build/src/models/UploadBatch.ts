@@ -41,6 +41,7 @@ export class UploadBatch {
     draftId: number;
     id?: string;
     private abortController?: AbortController;
+    private hashingControllers = new Map<string, AbortController>();
 
     private handlers = {
         accepted: (e: MessageEvent) => {
@@ -89,12 +90,14 @@ export class UploadBatch {
      * stays responsive. The resulting hex string is identical to the old one, so the
      * server-side checksum verification keeps working unchanged.
      */
-    async calculateChecksum(file: File, onProgress?: (fraction: number) => void): Promise<string> {
+    async calculateChecksum(file: File, onProgress?: (fraction: number) => void, signal?: AbortSignal): Promise<string> {
         const hasher = sha256.create();
 
         for (let offset = 0; offset < file.size; offset += HASH_CHUNK_SIZE) {
+            if (signal?.aborted) throw new DOMException('Hashing canceled', 'AbortError');
             const end = Math.min(offset + HASH_CHUNK_SIZE, file.size);
             const chunk = await file.slice(offset, end).arrayBuffer();
+            if (signal?.aborted) throw new DOMException('Hashing canceled', 'AbortError');
             hasher.update(chunk);
 
             onProgress?.(end / file.size);
@@ -103,6 +106,7 @@ export class UploadBatch {
             await new Promise<void>(resolve => setTimeout(resolve, 0));
         }
 
+        if (signal?.aborted) throw new DOMException('Hashing canceled', 'AbortError');
         onProgress?.(1);
         return hasher.hex();
     }
@@ -129,9 +133,11 @@ export class UploadBatch {
             progress: 0
         };
         this.files.push(pendingFile);
+        const hashingController = new AbortController();
+        this.hashingControllers.set(pendingFile.checksum, hashingController);
 
         try {
-            const checksum = await this.calculateChecksum(file, onProgress);
+            const checksum = await this.calculateChecksum(file, onProgress, hashingController.signal);
             // Hashing may take a while; check duplicates only after the real hash
             // is available, then replace the temporary identifier in-place.
             if (this.files.some(existing => existing !== pendingFile && existing.checksum === checksum)) {
@@ -144,11 +150,15 @@ export class UploadBatch {
         } catch (error) {
             if (pendingFile.previewUrl) URL.revokeObjectURL(pendingFile.previewUrl);
             this.files = this.files.filter(existing => existing !== pendingFile);
-            throw error;
+            if ((error as any)?.name !== 'AbortError') throw error;
+        } finally {
+            this.hashingControllers.delete(pendingFile.checksum);
         }
     }
 
     removeFile(checksum: string) {
+        this.hashingControllers.get(checksum)?.abort();
+        this.hashingControllers.delete(checksum);
         const removed = this.files.find(f => f.checksum === checksum);
         if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl);
         this.files = this.files.filter(f => f.checksum !== checksum);
