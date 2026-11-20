@@ -147,7 +147,19 @@
                     
                     <input x-ref="fileInput" class="hidden" type="file" multiple @change="handleFiles($event.target.files)">
                     
-                    <div x-show="files.length === 0">
+                    <div x-show="isProcessing" class="w-full px-3 py-2 mb-3 text-left rounded-lg bg-blue-50 dark:bg-slate-800">
+                        <div class="flex items-center justify-between gap-3 text-xs text-gray-600 dark:text-gray-300 mb-2">
+                            <span class="truncate" x-text="'Reading ' + processingName"></span>
+                            <span class="shrink-0" x-text="Math.round(processingProgress * 100) + '%'"></span>
+                        </div>
+                        <div class="h-1.5 rounded-full bg-gray-200 dark:bg-slate-700 overflow-hidden">
+                            <div class="h-full rounded-full bg-blue-500 transition-all"
+                                 :style="'width: ' + (processingProgress * 100) + '%'"></div>
+                        </div>
+                        <p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1">Large files are checked in small chunks. Keep this page open.</p>
+                    </div>
+
+                    <div x-show="files.length === 0 && !isProcessing">
                         <p class="text-sm text-gray-600">Click or drop files here.</p>
                     </div>
 
