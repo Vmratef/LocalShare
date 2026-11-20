@@ -30,6 +30,10 @@ export enum UploadBatchState {
 
 let nextDraftId = 1;
 
+// Size of the slices that are read and hashed one at a time.
+// Keeps memory usage small no matter how large the file is.
+const HASH_CHUNK_SIZE = 8 * 1024 * 1024; // 8 MiB
+
 export class UploadBatch {
     private sse: EventSource;
     files: UploadFile[] = [];
@@ -74,15 +78,39 @@ export class UploadBatch {
         this.sse.removeEventListener('upload_updated', this.handlers.updated);
     }
 
-    async calculateChecksum(file: File): Promise<string> {
-        const arrayBuffer = await file.arrayBuffer();
-        return sha256(arrayBuffer);
+    /**
+     * Calculates the SHA-256 of a file incrementally.
+     *
+     * The old implementation called `file.arrayBuffer()`, which loads the WHOLE file
+     * into memory. For large files that fails (out of memory / buffer too big), the
+     * promise rejects, and the file never shows up in the list.
+     *
+     * Here the file is read in small slices, so memory stays low and the browser
+     * stays responsive. The resulting hex string is identical to the old one, so the
+     * server-side checksum verification keeps working unchanged.
+     */
+    async calculateChecksum(file: File, onProgress?: (fraction: number) => void): Promise<string> {
+        const hasher = sha256.create();
+
+        for (let offset = 0; offset < file.size; offset += HASH_CHUNK_SIZE) {
+            const end = Math.min(offset + HASH_CHUNK_SIZE, file.size);
+            const chunk = await file.slice(offset, end).arrayBuffer();
+            hasher.update(chunk);
+
+            onProgress?.(end / file.size);
+
+            // Give the browser a chance to repaint / handle events between chunks.
+            await new Promise<void>(resolve => setTimeout(resolve, 0));
+        }
+
+        onProgress?.(1);
+        return hasher.hex();
     }
 
-    async addFile(file: File) {
+    async addFile(file: File, onProgress?: (fraction: number) => void) {
         if (this.state !== UploadBatchState.DRAFT) return;
 
-        const checksum = await this.calculateChecksum(file);
+        const checksum = await this.calculateChecksum(file, onProgress);
         if (this.files.some(f => f.checksum === checksum)) return;
 
         const mime = file.type || 'application/octet-stream';
