@@ -41,7 +41,7 @@ export class UploadBatch {
     draftId: number;
     id?: string;
     private abortController?: AbortController;
-    private hashingControllers = new Map<string, AbortController>();
+    private hashingControllers = new Map<UploadFile, AbortController>();
 
     private handlers = {
         accepted: (e: MessageEvent) => {
@@ -134,7 +134,7 @@ export class UploadBatch {
         };
         this.files.push(pendingFile);
         const hashingController = new AbortController();
-        this.hashingControllers.set(pendingFile.checksum, hashingController);
+        this.hashingControllers.set(pendingFile, hashingController);
 
         try {
             const checksum = await this.calculateChecksum(file, onProgress, hashingController.signal);
@@ -152,14 +152,16 @@ export class UploadBatch {
             this.files = this.files.filter(existing => existing !== pendingFile);
             if ((error as any)?.name !== 'AbortError') throw error;
         } finally {
-            this.hashingControllers.delete(pendingFile.checksum);
+            this.hashingControllers.delete(pendingFile);
         }
     }
 
     removeFile(checksum: string) {
-        this.hashingControllers.get(checksum)?.abort();
-        this.hashingControllers.delete(checksum);
         const removed = this.files.find(f => f.checksum === checksum);
+        if (removed) {
+            this.hashingControllers.get(removed)?.abort();
+            this.hashingControllers.delete(removed);
+        }
         if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl);
         this.files = this.files.filter(f => f.checksum !== checksum);
     }
