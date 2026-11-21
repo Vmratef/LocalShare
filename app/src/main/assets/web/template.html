@@ -3,9 +3,11 @@
 <html lang="en"
       x-data="{
         darkMode: localStorage.getItem('dark') === 'true' ||
-                 (!('dark' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)
+                 (!('dark' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches),
+        themePalette: localStorage.getItem('palette') || 'classic'
       }"
-      :class="{ 'dark': darkMode }">
+      :class="{ 'dark': darkMode }"
+      :data-palette="themePalette">
 <head>
     <meta charset="UTF-8">
     <meta name="generator" content="LocalShare">
@@ -71,6 +73,18 @@
                 <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
             </span>
         </button>
+
+        <!-- Palette selector -->
+        <select x-model="themePalette" @change="localStorage.setItem('palette', themePalette)" class="ls-theme-select" title="Choose appearance" aria-label="Choose appearance">
+            <option value="classic">Classic</option>
+            <option value="sunset">Sunset</option>
+            <option value="blossom">Blossom</option>
+            <option value="ocean">Ocean</option>
+            <option value="lavender">Lavender</option>
+            <option value="tokyo">Tokyo</option>
+            <option value="lime">Lime</option>
+            <option value="monochrome">Mono</option>
+        </select>
 
         <!-- Theme Toggle -->
         <button x-bind="ThemeToggle">
