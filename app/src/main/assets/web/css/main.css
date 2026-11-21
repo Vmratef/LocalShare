@@ -230,7 +230,7 @@ html.dark[data-palette="lime"] { --ls-bg:#0A120D; --ls-surface:rgba(16,29,19,.9)
 html[data-palette="monochrome"] { --ls-bg:#F5F5F5; --ls-surface:rgba(255,255,255,.9); --ls-text:#202020; --ls-muted:#686868; --ls-border:rgba(41,41,41,.16); --ls-primary:#292929; --ls-primary-hover:#080808; --ls-secondary:#555555; --ls-accent:#777777; --ls-glow:rgba(85,85,85,.12); }
 html.dark[data-palette="monochrome"] { --ls-bg:#000000; --ls-surface:rgba(10,10,10,.92); --ls-text:#F2F2F2; --ls-muted:#B3B3B3; --ls-border:rgba(242,242,242,.16); --ls-primary:#F2F2F2; --ls-primary-hover:#FFFFFF; --ls-secondary:#B3B3B3; --ls-accent:#888888; --ls-glow:rgba(255,255,255,.10); }
 
-body { color:var(--ls-text); background:radial-gradient(ellipse at 12% 8%,var(--ls-glow),transparent 36%),radial-gradient(ellipse at 88% 14%,color-mix(in srgb,var(--ls-secondary) 14%,transparent),transparent 38%),linear-gradient(135deg,var(--ls-bg),var(--ls-surface)); background-attachment:fixed; }
+body { color:var(--ls-text); background:radial-gradient(ellipse at 12% 8%,var(--ls-glow),transparent 36%),radial-gradient(ellipse at 88% 14%,var(--ls-glow),transparent 38%),linear-gradient(135deg,var(--ls-bg),var(--ls-surface)); background-attachment:fixed; }
 .ls-header,.ls-toolbar { color:var(--ls-text); background:var(--ls-surface); border-color:var(--ls-border); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px); }
 .ls-header { border-bottom:1px solid var(--ls-border); }
 .ls-toolbar,.ls-card-grid,.ls-card-list { border:1px solid var(--ls-border); box-shadow:var(--ls-shadow); }
@@ -250,3 +250,22 @@ body { color:var(--ls-text); background:radial-gradient(ellipse at 12% 8%,var(--
 .ls-theme-select { max-width:118px; min-width:96px; padding:.5rem .6rem; border-radius:.65rem; font-size:.78rem; outline:none; }
 .ls-theme-select:focus { border-color:var(--ls-primary); box-shadow:0 0 0 2px var(--ls-glow); }
 @media(max-width:480px) { .ls-header { padding:1rem; } .ls-theme-select { max-width:104px; min-width:88px; } }
+
+/* Keep the old utility-based markup in step with the selected palette. */
+html[data-palette] .text-gray-900,
+html[data-palette] .text-gray-800,
+html[data-palette] .text-gray-700 { color:var(--ls-text) !important; }
+html[data-palette] .text-gray-600,
+html[data-palette] .text-gray-500 { color:var(--ls-muted) !important; }
+html.dark[data-palette] .dark\\:text-white,
+html.dark[data-palette] .dark\\:text-gray-100,
+html.dark[data-palette] .dark\\:text-gray-200 { color:var(--ls-text) !important; }
+html.dark[data-palette] .dark\\:text-gray-300,
+html.dark[data-palette] .dark\\:text-gray-400 { color:var(--ls-muted) !important; }
+html[data-palette] .bg-white,
+html[data-palette] .bg-gray-50,
+html[data-palette] .bg-gray-100 { background-color:var(--ls-surface) !important; }
+html.dark[data-palette] .dark\\:bg-slate-900,
+html.dark[data-palette] .dark\\:bg-slate-800,
+html.dark[data-palette] .dark\\:bg-slate-700,
+html.dark[data-palette] .dark\\:bg-slate-600 { background-color:var(--ls-surface) !important; }
