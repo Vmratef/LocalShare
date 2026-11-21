@@ -257,15 +257,15 @@ html[data-palette] .text-gray-800,
 html[data-palette] .text-gray-700 { color:var(--ls-text) !important; }
 html[data-palette] .text-gray-600,
 html[data-palette] .text-gray-500 { color:var(--ls-muted) !important; }
-html.dark[data-palette] .dark\\:text-white,
-html.dark[data-palette] .dark\\:text-gray-100,
-html.dark[data-palette] .dark\\:text-gray-200 { color:var(--ls-text) !important; }
-html.dark[data-palette] .dark\\:text-gray-300,
-html.dark[data-palette] .dark\\:text-gray-400 { color:var(--ls-muted) !important; }
+html.dark[data-palette] .dark\:text-white,
+html.dark[data-palette] .dark\:text-gray-100,
+html.dark[data-palette] .dark\:text-gray-200 { color:var(--ls-text) !important; }
+html.dark[data-palette] .dark\:text-gray-300,
+html.dark[data-palette] .dark\:text-gray-400 { color:var(--ls-muted) !important; }
 html[data-palette] .bg-white,
 html[data-palette] .bg-gray-50,
 html[data-palette] .bg-gray-100 { background-color:var(--ls-surface) !important; }
-html.dark[data-palette] .dark\\:bg-slate-900,
-html.dark[data-palette] .dark\\:bg-slate-800,
-html.dark[data-palette] .dark\\:bg-slate-700,
-html.dark[data-palette] .dark\\:bg-slate-600 { background-color:var(--ls-surface) !important; }
+html.dark[data-palette] .dark\:bg-slate-900,
+html.dark[data-palette] .dark\:bg-slate-800,
+html.dark[data-palette] .dark\:bg-slate-700,
+html.dark[data-palette] .dark\:bg-slate-600 { background-color:var(--ls-surface) !important; }
