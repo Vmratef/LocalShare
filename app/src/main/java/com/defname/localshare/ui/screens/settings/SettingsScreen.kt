@@ -6,6 +6,12 @@ package com.defname.localshare.ui.screens.settings
 
 import com.defname.localshare.ui.components.ThemeToggleButton
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.draw.clip
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -23,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.defname.localshare.ui.theme.ThemeController
 import com.defname.localshare.ui.theme.ThemeMode
+import com.defname.localshare.ui.theme.ThemePalette
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -97,26 +104,28 @@ fun SettingsScreen(
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
         ) {
-            // Appearance
+            // Appearance: Comfort-style independent light/dark palettes and preview swatches.
             SettingsGroup(title = "Appearance") {
                 SettingsRow {
                     Column(Modifier.weight(1f)) {
-                        Text("Theme", style = MaterialTheme.typography.bodyLarge)
+                        Text("Theme mode", style = MaterialTheme.typography.bodyLarge)
                         Spacer(Modifier.height(8.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(
-                                ThemeMode.SYSTEM to "System",
-                                ThemeMode.LIGHT to "Light",
-                                ThemeMode.DARK to "Dark"
-                            ).forEach { (mode, label) ->
-                                FilterChip(
-                                    selected = ThemeController.mode == mode,
-                                    onClick = { ThemeController.set(context, mode) },
-                                    label = { Text(label) }
-                                )
+                            listOf(ThemeMode.SYSTEM to "System", ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark").forEach { (mode, label) ->
+                                FilterChip(selected = ThemeController.mode == mode, onClick = { ThemeController.set(context, mode) }, label = { Text(label) })
                             }
                         }
                     }
+                }
+                ThemePalettePicker(title = "Light appearance", selected = ThemeController.lightPalette, onSelect = { ThemeController.setLight(context, it) })
+                ThemePalettePicker(title = "Dark appearance", selected = ThemeController.darkPalette, onSelect = { ThemeController.setDark(context, it) })
+                if (ThemeController.mode != ThemeMode.LIGHT) {
+                    SettingsSwitchRow(
+                        title = "Pure black dark mode",
+                        subtitle = "Use black backgrounds in dark mode to reduce screen glow.",
+                        checked = ThemeController.pureBlack,
+                        onCheckedChange = { ThemeController.setPureBlack(context, it) }
+                    )
                 }
             }
 
@@ -357,6 +366,42 @@ fun SettingsScreenPreview() {
         SettingsScreen(
             onOpenDrawer = {},
         )
+    }
+}
+
+
+@Composable
+private fun ThemePalettePicker(title: String, selected: com.defname.localshare.ui.theme.ThemePalette, onSelect: (com.defname.localshare.ui.theme.ThemePalette) -> Unit) {
+    val darkPreview = title.startsWith("Dark")
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(horizontal = 16.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            com.defname.localshare.ui.theme.ThemePalette.values().forEach { palette ->
+                val chosen = palette == selected
+                val scheme = palette.colors(darkPreview)
+                Column(
+                    modifier = Modifier
+                        .width(112.dp)
+                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                        .background(scheme.surface)
+                        .then(if (chosen) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.RoundedCornerShape(16.dp)) else Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, androidx.compose.foundation.shape.RoundedCornerShape(16.dp)))
+                        .clickable { onSelect(palette) }
+                        .padding(9.dp)
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Box(Modifier.weight(1f).height(30.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)).background(scheme.primary))
+                        Box(Modifier.weight(1f).height(30.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)).background(scheme.secondary))
+                        Box(Modifier.weight(1f).height(30.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)).background(scheme.tertiary))
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(palette.label, style = MaterialTheme.typography.labelMedium, color = scheme.onSurface, maxLines = 1)
+                    if (chosen) Text("Selected", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
     }
 }
 
