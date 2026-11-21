@@ -2,6 +2,6 @@
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- no background: the glass logo floats on its own -->
     <background android:drawable="@android:color/transparent"/>
-    <foreground android:drawable="@drawable/ic_launcher_fg_logo"/>
+    <foreground android:drawable="@drawable/ic_launcher_foreground"/>
     <monochrome android:drawable="@drawable/ic_launcher_glass_mono"/>
 </adaptive-icon>
