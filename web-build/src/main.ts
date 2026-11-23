@@ -55,7 +55,10 @@ document.addEventListener('alpine:init', () => {
     Alpine.store('sse', sse);
     Alpine.store('app', AppStore);
     Alpine.store('sidebar', SidebarStore);
-    Alpine.store('clientId', initialClientId);
+    // EventSource may not have delivered its init event yet. Alpine stores must never receive null.
+    // Passing null here throws during alpine:init and aborts every component registration.
+    Alpine.store('clientId', initialClientId ?? '');
+    debug.log('info', 'Alpine stores registered', { clientIdReady: !!initialClientId });
 
     // 2. Register Components
     Alpine.data('fileManager', FileManager);
