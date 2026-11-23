@@ -33,6 +33,14 @@ sealed class WebAction {
 
     @Serializable @SerialName("abort_file_upload")
     data class AbortFileUpload(val id: String) : WebAction()
+
+    // WebRTC signaling only: SDP/ICE metadata is relayed through the server; file bytes never are.
+    @Serializable @SerialName("web_rtc_signal")
+    data class WebRtcSignal(
+        val sessionId: String,
+        val payload: String,
+        val targetIp: String? = null
+    ) : WebAction()
 }
 
 
