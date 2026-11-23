@@ -20,7 +20,16 @@ export const Dropzone = () => ({
         return this.activeBatch?.files || [];
     },
 
-    init() { this.createNewBatch(); },
+    init() { this.createNewBatch(); (window as any).LocalShareDebug?.log('info', 'Dropzone initialized', { batchReady: !!this.activeBatch, state: this.activeBatch?.state }); },
+
+    onFileInputChange(event: Event) {
+        const input = event.target as HTMLInputElement;
+        const files = Array.from(input.files || []);
+        (window as any).LocalShareDebug?.log('info', 'File picker change received', { count: files.length, files: files.map(file => ({ name: file.name, size: file.size, type: file.type, lastModified: file.lastModified })) });
+        // Snapshot File objects before resetting the input so selecting the same file works again.
+        void this.handleFiles(files);
+        input.value = '';
+    },
 
     createNewBatch() {
         const appStore = Alpine.store('app') as any;
