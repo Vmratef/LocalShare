@@ -26,7 +26,7 @@ type Signal = {
 type PeerState = {
     pc: RTCPeerConnection; channel?: RTCDataChannel; file?: File; remoteIp: string;
     direction: 'sending' | 'receiving'; received: number; chunks: BlobPart[];
-    writable?: any; metadata?: { name: string; size: number; mimeType: string };
+    writable?: any; writeChain: Promise<void>; metadata?: { name: string; size: number; mimeType: string };
 };
 const CHUNK_SIZE = 256 * 1024;
 const BUFFERED_LIMIT = 1024 * 1024;
@@ -87,7 +87,7 @@ export class DirectTransferManager {
         }
         this.offers.delete(id);
         this.peers.set(id, { pc: this.createPeerConnection(id, offer.from), remoteIp: offer.from,
-            direction: 'receiving', received: 0, chunks: [], writable });
+            direction: 'receiving', received: 0, chunks: [], writable, writeChain: Promise.resolve() });
         this.report(id, offer.name, 'receiving', 'Waiting for direct connection', 0, offer.size);
         await this.sendSignal(id, { kind: 'accept' }, offer.from);
     }
@@ -165,7 +165,7 @@ export class DirectTransferManager {
 
     private async createSenderPeer(id: string, remoteIp: string, file: File) {
         const pc = this.createPeerConnection(id, remoteIp);
-        const peer: PeerState = { pc, file, remoteIp, direction: 'sending', received: 0, chunks: [] };
+        const peer: PeerState = { pc, file, remoteIp, direction: 'sending', received: 0, chunks: [], writeChain: Promise.resolve() };
         this.peers.set(id, peer);
         const channel = pc.createDataChannel('localshare-file', { ordered: true });
         peer.channel = channel; channel.bufferedAmountLowThreshold = BUFFERED_LIMIT / 2;
@@ -189,7 +189,10 @@ export class DirectTransferManager {
         if (!peer || peer.direction !== 'receiving' || !signal.description) return;
         peer.pc.ondatachannel = event => {
             peer.channel = event.channel; event.channel.binaryType = 'arraybuffer';
-            event.channel.onmessage = message => { void this.receiveMessage(id, peer, message.data); };
+            event.channel.onmessage = message => {
+                peer.writeChain = peer.writeChain.then(() => this.receiveMessage(id, peer, message.data))
+                    .catch(error => this.report(id, peer.metadata?.name || 'File', 'receiving', 'Write failed', peer.received, peer.metadata?.size || 0, (error as Error).message));
+            };
         };
         await peer.pc.setRemoteDescription(signal.description);
         const answer = await peer.pc.createAnswer();
