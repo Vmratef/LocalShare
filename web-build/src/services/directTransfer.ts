@@ -175,7 +175,11 @@ export class DirectTransferManager {
             if (typeof event.data !== 'string') return;
             try {
                 const message = JSON.parse(event.data);
-                if (message.type === 'ack') this.report(id, file.name, 'sending', 'Sent directly', file.size, file.size);
+                if (message.type === 'ack') {
+                    this.report(id, file.name, 'sending', 'Waiting for receiver confirmation', file.size, file.size);
+                    this.outgoing.delete(id);
+                    this.closePeer(id);
+                }
             } catch { /* ignore unrelated channel messages */ }
         };
         const offer = await pc.createOffer();
@@ -278,7 +282,7 @@ export class DirectTransferManager {
                 try { peer.channel?.send(JSON.stringify({ type: 'ack' })); } catch { /* sender may already be gone */ }
                 this.report(id, peer.metadata.name, 'receiving', 'Received directly',
                     peer.metadata.size, peer.metadata.size);
-                this.closePeer(id);
+                setTimeout(() => this.closePeer(id), 1000);
             } else if (message.type === 'cancel') {
                 if (peer.writable) await peer.writable.abort();
                 this.report(id, peer.metadata?.name || 'File', 'receiving', 'Canceled by sender',
