@@ -44,6 +44,7 @@ export type WebAction =
     | WebActionRequestUploadPermission
     | WebActionInitializeFileUpload
     | WebActionAbortFileUpload
+    | WebActionWebRtcSignal
 
 
 
@@ -60,6 +61,21 @@ export interface BaseWebEvent {
 export interface WebEventInit extends BaseWebEvent {
     type: 'init';
     uploadsEnabled: boolean;
+    clientId: string;
+}
+
+export interface WebActionWebRtcSignal extends BaseWebAction {
+    type: 'web_rtc_signal';
+    sessionId: string;
+    payload: string;
+    targetIp?: string;
+}
+
+export interface WebEventWebRtcSignal extends BaseWebEvent {
+    type: 'web_rtc_signal';
+    sessionId: string;
+    from: string;
+    payload: string;
 }
 
 export interface WebEventAddFile extends BaseWebEvent {
@@ -136,7 +152,8 @@ export type WebEvent =
     | WebEventUploadPermissionChange
     | WebEventUploadAccepted
     | WebEventUploadDenied
-    | WebEventUploadUpdated;
+    | WebEventUploadUpdated
+    | WebEventWebRtcSignal;
 
 export interface SidebarItem {
     id: number;
