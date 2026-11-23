@@ -146,14 +146,13 @@ class RemoteCommunicationRepository(
                         payload = action.payload
                     )
                 )
-                // Native Android handles incoming discovery. Do not expose a competing
-                // browser-side receive offer, which may buffer large files in memory.
-                val signalKind = runCatching { JSONObject(action.payload).optString("kind") }.getOrNull()
-                if (signalKind != "discover") {
-                    _clientEventFlows.forEach { (ip, flow) ->
-                        if (ip != remoteIp && (action.targetIp == null || action.targetIp == ip)) {
-                            flow.tryEmit(event)
-                        }
+                // Discovery is signaling metadata, not file data. Forward it to the
+                // other browser clients immediately so they can display the offer before
+                // accepting. The native receiver may also observe the signal, but file
+                // bytes remain on the selected WebRTC peer-to-peer data channel.
+                _clientEventFlows.forEach { (ip, flow) ->
+                    if (ip != remoteIp && (action.targetIp == null || action.targetIp == ip)) {
+                        flow.tryEmit(event)
                     }
                 }
             }
