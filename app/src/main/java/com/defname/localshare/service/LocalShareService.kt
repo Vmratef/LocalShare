@@ -50,6 +50,7 @@ class LocalShareService : Service() {
     private val featureFlagsProvider: FeatureFlagsProvider by inject()
 
     private val json: Json by inject()
+    private val directWebRtcReceiver by lazy { DirectWebRtcReceiver(this, remoteCommunicationRepository, notificationHelper) }
 
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -63,6 +64,8 @@ class LocalShareService : Service() {
         const val ACTION_GRANT_PERMISSION = "com.defname.localshare.GRANT_PERMISSION"
         const val APPROVE_UPLOAD_PERMISSION = "com.defname.localshare.APPROVE_UPLOAD_PERMISSION"
         const val DENY_UPLOAD_PERMISSION = "com.defname.localshare.DENY_UPLOAD_PERMISSION"
+        const val ACTION_ACCEPT_WEBRTC = "com.defname.localshare.ACTION_ACCEPT_WEBRTC"
+        const val ACTION_REJECT_WEBRTC = "com.defname.localshare.ACTION_REJECT_WEBRTC"
     }
 
     private val activeUriPermissions = mutableSetOf<Uri>()
@@ -74,6 +77,11 @@ class LocalShareService : Service() {
         }
 
         observePermissionRequests()
+        serviceScope.launch {
+            remoteCommunicationRepository.webRtcSignals.collect { signal ->
+                directWebRtcReceiver.onSignal(signal.sessionId, signal.remoteIp, signal.payload)
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -109,6 +117,16 @@ class LocalShareService : Service() {
             DENY_UPLOAD_PERMISSION -> {
                 securityHandler.denyUploadPermission(ip)
                 cancelNotification(ip)
+            }
+            ACTION_ACCEPT_WEBRTC -> {
+                val sessionId = intent?.getStringExtra("session_id") ?: return START_NOT_STICKY
+                val remoteIp = intent.getStringExtra("remote_ip") ?: return START_NOT_STICKY
+                directWebRtcReceiver.accept(sessionId, remoteIp)
+            }
+            ACTION_REJECT_WEBRTC -> {
+                val sessionId = intent?.getStringExtra("session_id") ?: return START_NOT_STICKY
+                val remoteIp = intent.getStringExtra("remote_ip") ?: return START_NOT_STICKY
+                directWebRtcReceiver.reject(sessionId, remoteIp)
             }
         }
         return START_NOT_STICKY
@@ -250,6 +268,7 @@ class LocalShareService : Service() {
 
     override fun onDestroy() {
         stopHttpServer()
+        directWebRtcReceiver.dispose()
         serviceScope.cancel()
         super.onDestroy()
     }
