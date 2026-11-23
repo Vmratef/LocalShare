@@ -49,6 +49,7 @@ class DirectWebRtcReceiver(
     )
 
     private val transfers = ConcurrentHashMap<String, Transfer>()
+    private val pendingOffers = ConcurrentHashMap<String, String>()
     private val pendingCandidates = ConcurrentHashMap<String, MutableList<IceCandidate>>()
     private val remoteDescriptionReady = ConcurrentHashMap.newKeySet<String>()
     private val writer: ExecutorService = Executors.newSingleThreadExecutor()
@@ -62,14 +63,18 @@ class DirectWebRtcReceiver(
                     val name = signal.optString("name", "file")
                     val size = signal.optLong("size", -1L)
                     if (size < 0L || sessionId.isBlank()) return
+                    pendingOffers[sessionId] = remoteIp
                     notifications.showWebRtcIncomingNotification(sessionId, remoteIp, name, size)
                 }
                 "offer" -> acceptOffer(sessionId, remoteIp, signal)
                 "candidate" -> {
                     val active = transfers[sessionId]
-                    if (active == null || active.remoteIp == remoteIp) addCandidate(sessionId, signal.optJSONObject("candidate"))
+                    if (active?.remoteIp == remoteIp || pendingOffers[sessionId] == remoteIp) {
+                        addCandidate(sessionId, signal.optJSONObject("candidate"))
+                    }
                 }
                 "cancel" -> {
+                    if (pendingOffers.remove(sessionId) == remoteIp) notifications.cancelWebRtcNotification(sessionId)
                     if (transfers[sessionId]?.remoteIp == remoteIp) closeTransfer(sessionId, "Canceled by sender")
                 }
             }
@@ -79,7 +84,10 @@ class DirectWebRtcReceiver(
     }
 
     fun accept(sessionId: String, remoteIp: String) {
-        if (transfers.containsKey(sessionId)) return
+        if (pendingOffers.remove(sessionId) != remoteIp || transfers.containsKey(sessionId)) {
+            notifications.cancelWebRtcNotification(sessionId)
+            return
+        }
         try {
             val config = PeerConnection.RTCConfiguration(
                 listOf(PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer())
@@ -138,6 +146,7 @@ class DirectWebRtcReceiver(
     }
 
     fun reject(sessionId: String, remoteIp: String) {
+        if (pendingOffers.remove(sessionId) != remoteIp) return
         sendSignal(sessionId, remoteIp, JSONObject().put("kind", "reject"))
         pendingCandidates.remove(sessionId)
         notifications.cancelWebRtcNotification(sessionId)
