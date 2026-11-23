@@ -132,6 +132,22 @@ class RemoteCommunicationRepository(
                     uploadManager.onUploadCanceledByClient(remoteIp, action.id)
                 }
             }
+            is WebAction.WebRtcSignal -> {
+                // The server is a signaling broker only. Binary file chunks travel peer-to-peer.
+                if (action.sessionId.isBlank() || action.sessionId.length > 128 || action.payload.length > 256 * 1024) return
+                val event = EventEnvelop(
+                    event = WebEvent.WebRtcSignal(
+                        sessionId = action.sessionId,
+                        from = remoteIp,
+                        payload = action.payload
+                    )
+                )
+                _clientEventFlows.forEach { (ip, flow) ->
+                    if (ip != remoteIp && (action.targetIp == null || action.targetIp == ip)) {
+                        flow.tryEmit(event)
+                    }
+                }
+            }
         }
     }
 
