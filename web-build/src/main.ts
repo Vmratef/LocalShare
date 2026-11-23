@@ -10,12 +10,17 @@ import { Dropzone } from './components/dropzone';
 
 // Initialize SSE as a global property so it's available before stores init
 const sse = new EventSource(`/${window.token}/events`);
+let initialClientId: string | null = null;
+sse.addEventListener('init', (event: MessageEvent) => {
+    try { initialClientId = (JSON.parse(event.data) as { clientId: string }).clientId; } catch { /* ignore malformed init */ }
+});
 
 document.addEventListener('alpine:init', () => {
     // 1. Register Global Stores
     Alpine.store('sse', sse);
     Alpine.store('app', AppStore);
     Alpine.store('sidebar', SidebarStore);
+    Alpine.store('clientId', initialClientId);
 
     // 2. Register Components
     Alpine.data('fileManager', FileManager);
