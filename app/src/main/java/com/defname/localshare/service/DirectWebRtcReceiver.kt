@@ -175,8 +175,8 @@ class DirectWebRtcReceiver(
             json.optString("candidate")
         )
         val transfer = transfers[id]
-        if (transfer == null) {
-            pendingCandidates.computeIfAbsent(id) { mutableListOf() }.add(candidate)
+        if (transfer == null || !remoteDescriptionReady.contains(id)) {
+            pendingCandidates.computeIfAbsent(id) { java.util.Collections.synchronizedList(mutableListOf()) }.add(candidate)
         } else {
             transfer.peer.addIceCandidate(candidate)
         }
