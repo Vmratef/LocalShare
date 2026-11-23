@@ -97,6 +97,7 @@ dependencies {
     implementation(libs.coil.video)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.datastore.preferences)
+    implementation("io.github.webrtc-sdk:android:150.7871.08")
 
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.core)
