@@ -39,6 +39,7 @@ class DirectWebRtcReceiver(
         var output: BufferedOutputStream? = null,
         var expected: Long = 0,
         var received: Long = 0,
+        var lastNotifiedBytes: Long = 0,
         var name: String = "file",
         var mimeType: String = "application/octet-stream"
     )
@@ -77,9 +78,9 @@ class DirectWebRtcReceiver(
             val observer = object : PeerConnection.Observer {
                 override fun onSignalingChange(state: PeerConnection.SignalingState?) = Unit
                 override fun onIceConnectionChange(state: PeerConnection.IceConnectionState?) {
-                    if (state == PeerConnection.IceConnectionState.FAILED ||
-                        state == PeerConnection.IceConnectionState.DISCONNECTED) {
-                        Log.w(TAG, "WebRTC connection $sessionId state=$state")
+                    if (state == PeerConnection.IceConnectionState.FAILED) {
+                        Log.w(TAG, "WebRTC connection $sessionId failed")
+                        fail(sessionId, "Direct connection failed")
                     }
                 }
                 override fun onIceConnectionReceivingChange(receiving: Boolean) = Unit
@@ -222,10 +223,13 @@ class DirectWebRtcReceiver(
             output.write(bytes)
             transfer.received += bytes.size.toLong()
             if (transfer.received > transfer.expected) throw IllegalStateException("Received more data than announced")
-            notifications.updateWebRtcNotification(
-                transfer.id, "Receiving ${transfer.name}",
-                transfer.received, transfer.expected
-            )
+            if (transfer.received - transfer.lastNotifiedBytes >= 4L * 1024L * 1024L) {
+                transfer.lastNotifiedBytes = transfer.received
+                notifications.updateWebRtcNotification(
+                    transfer.id, "Receiving ${transfer.name}",
+                    transfer.received, transfer.expected
+                )
+            }
         } catch (error: Exception) {
             Log.e(TAG, "WebRTC file write failed", error)
             fail(transfer.id, error.message ?: "File write failed")
@@ -247,6 +251,9 @@ class DirectWebRtcReceiver(
         try { transfer?.channel?.dispose() } catch (_: Exception) { }
         try { transfer?.peer?.close() } catch (_: Exception) { }
         try { transfer?.peer?.dispose() } catch (_: Exception) { }
+        if (reason != null) {
+            try { transfer?.file?.delete() } catch (_: Exception) { }
+        }
         pendingCandidates.remove(id)
         if (reason != null) notifications.updateWebRtcNotification(id, reason, 0, 0)
     }
