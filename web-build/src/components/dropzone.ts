@@ -50,6 +50,18 @@ export const Dropzone = () => ({
         if (file) this.activeBatch?.removeFile(file.checksum);
     },
 
+    async sendDirect() {
+        const files = this.activeBatch?.files.map(item => item.file) || [];
+        if (files.length === 0) return;
+        const rtc = Alpine.store('rtc') as any;
+        if (!rtc) { this.errorMessage = 'Direct transfer is not ready. Refresh both devices and try again.'; return; }
+        try {
+            await rtc.startBroadcast(files);
+            (Alpine.store('app') as any).showUploadModal = false;
+            this.createNewBatch();
+        } catch (error) { this.errorMessage = (error as Error).message || 'Could not start direct transfer.'; }
+    },
+
     async submit() {
         const batch = this.activeBatch;
         if (!batch || batch.files.length === 0 || this.isSubmitting) return;
