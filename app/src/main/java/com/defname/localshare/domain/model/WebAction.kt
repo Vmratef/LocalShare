@@ -34,7 +34,7 @@ sealed class WebAction {
     @Serializable @SerialName("abort_file_upload")
     data class AbortFileUpload(val id: String) : WebAction()
 
-    // WebRTC signaling only: SDP/ICE metadata is relayed through the server; file bytes never are.
+    // Signaling metadata only; binary file data is never sent through the server.
     @Serializable @SerialName("web_rtc_signal")
     data class WebRtcSignal(
         val sessionId: String,
@@ -78,7 +78,7 @@ sealed class WebEvent {
     @Serializable @SerialName("remove_file")
     data class RemoveFile(val id: String) : WebEvent()
 
-    // Another device just uploaded this file: offer it to this device (download or decline).
+    // Another device is uploading / just uploaded this file: offer it to this device.
     @Serializable @SerialName("incoming_file")
     data class IncomingFile(
         val id: String,
@@ -86,7 +86,8 @@ sealed class WebEvent {
         val size: Long,
         val mimeType: String,
         val iconFile: String,
-        val from: String
+        val from: String,
+        val inProgress: Boolean = false
     ) : WebEvent()
 
     @Serializable @SerialName("add_text")
@@ -119,12 +120,11 @@ sealed class WebEvent {
     data class UploadUpdated(
         val id: String,
         val fileChecksum: String,
-        val status: UploadStatus =  UploadStatus.PENDING,
+        val status: UploadStatus = UploadStatus.PENDING,
         val progress: Long = 0,
         val message: String? = null
     ) : WebEvent()
 
-    // Signaling envelopes contain only SDP/ICE metadata, never file content.
     @Serializable @SerialName("web_rtc_signal")
     data class WebRtcSignal(
         val sessionId: String,
