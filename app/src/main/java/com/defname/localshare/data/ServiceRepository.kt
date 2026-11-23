@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import java.util.concurrent.ConcurrentHashMap
 
 enum class RuntimeState {
     RUNNING,
@@ -57,10 +58,21 @@ class ServiceRepository(
     // offered to the other devices, which can accept (download) or decline them.
     private val _receivedFiles = MutableStateFlow<List<FileInfo>>(emptyList())
     val receivedFiles = _receivedFiles.asStateFlow()
+    private val receivedFileOrigins = ConcurrentHashMap<String, String>()
 
-    fun addReceivedFile(file: FileInfo) {
+    /** Keep the uploader IP with each received file so reconnecting peers can recover offers. */
+    fun addReceivedFile(file: FileInfo, fromIp: String) {
+        receivedFileOrigins[file.id] = fromIp
         _receivedFiles.update { list ->
             if (list.any { it.id == file.id }) list else list + file
+        }
+    }
+
+    /** Pending incoming files visible to this client, excluding the device that uploaded them. */
+    fun incomingFilesForClient(clientIp: String): List<Pair<FileInfo, String>> {
+        return _receivedFiles.value.mapNotNull { file ->
+            val origin = receivedFileOrigins[file.id] ?: return@mapNotNull null
+            if (origin == clientIp) null else file to origin
         }
     }
 

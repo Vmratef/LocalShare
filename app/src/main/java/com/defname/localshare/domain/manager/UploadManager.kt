@@ -212,7 +212,7 @@ class UploadManager(
                 mimeType = sharedMime,
                 iconFile = IconMap.getIcon(sharedMime)
             )
-            serviceRepository.addReceivedFile(receivedInfo)
+            serviceRepository.addReceivedFile(receivedInfo, clientIp)
             _receivedFileEvents.emit(receivedInfo to clientIp)
 
             val event = EventEnvelop(

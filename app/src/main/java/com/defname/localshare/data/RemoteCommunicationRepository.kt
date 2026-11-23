@@ -76,7 +76,26 @@ class RemoteCommunicationRepository(
             personalFlow,
             observePermissionChangeFor(remoteIp),
             observeGlobalEvents()
-        ).onStart { emit(EventEnvelop(event = WebEvent.Init(settingsRepository.settingsFlow.first().uploadFeatureActive))) }
+        ).onStart {
+            emit(EventEnvelop(event = WebEvent.Init(settingsRepository.settingsFlow.first().uploadFeatureActive)))
+
+            // Replay outstanding incoming-file offers after a browser reconnects or opens late.
+            // The uploader must never receive its own incoming-file offer.
+            serviceRepository.incomingFilesForClient(remoteIp).forEach { (file, fromIp) ->
+                emit(
+                    EventEnvelop(
+                        event = WebEvent.IncomingFile(
+                            id = file.id,
+                            name = file.name,
+                            size = file.size,
+                            mimeType = file.mimeType,
+                            iconFile = file.iconFile,
+                            from = fromIp
+                        )
+                    )
+                )
+            }
+        }
     }
 
     suspend fun sendEvent(eventTo: Pair<EventEnvelop, String>) {
