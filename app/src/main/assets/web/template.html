@@ -171,7 +171,7 @@
             <form @submit.prevent="submit" class="text-center">
                 <div class="ls-dropzone"
                      :class="dragActive ? 'active' : 'inactive'"
-                     @click.self="$refs.fileInput.click()"
+                     @click="$refs.fileInput.click()"
                      @drop.prevent="dropFile($event)"
                      @dragover.prevent="dragOver"
                      @dragleave.prevent="dragLeave">
