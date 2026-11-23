@@ -86,6 +86,11 @@ class ServiceRepository(
 
     fun liveUploadFor(fileId: String): LiveUpload? = liveUploads[fileId]
 
+    /** Mark the upload complete and release its registry entry; active readers retain the state object. */
+    fun finishLiveUpload(fileId: String) {
+        liveUploads.remove(fileId)?.finished = true
+    }
+
     fun incomingFilesForClient(clientIp: String): List<Pair<FileInfo, String>> {
         return _receivedFiles.value.mapNotNull { file ->
             val origin = receivedFileOrigins[file.id] ?: return@mapNotNull null
