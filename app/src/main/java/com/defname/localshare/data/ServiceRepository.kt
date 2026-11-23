@@ -31,6 +31,12 @@ object CallAttributes {
     val connectionId = AttributeKey<String>("connectionId")
 }
 
+/** State of a file that another device is uploading right now (shared with the download route). */
+class LiveUpload(val expectedSize: Long) {
+    @Volatile var finished: Boolean = false
+    @Volatile var failed: Boolean = false
+}
+
 
 data class RuntimeData(
     val fileList: List<FileInfo> = emptyList(),
@@ -54,13 +60,11 @@ class ServiceRepository(
             initialValue = emptyList()
         )
 
-    // Files received from other devices. Kept apart from the shared list: they are only
-    // offered to the other devices, which can accept (download) or decline them.
     private val _receivedFiles = MutableStateFlow<List<FileInfo>>(emptyList())
     val receivedFiles = _receivedFiles.asStateFlow()
     private val receivedFileOrigins = ConcurrentHashMap<String, String>()
+    private val liveUploads = ConcurrentHashMap<String, LiveUpload>()
 
-    /** Keep the uploader IP with each received file so reconnecting peers can recover offers. */
     fun addReceivedFile(file: FileInfo, fromIp: String) {
         receivedFileOrigins[file.id] = fromIp
         _receivedFiles.update { list ->
@@ -68,7 +72,20 @@ class ServiceRepository(
         }
     }
 
-    /** Pending incoming files visible to this client, excluding the device that uploaded them. */
+    fun removeReceivedFile(fileId: String) {
+        receivedFileOrigins.remove(fileId)
+        liveUploads.remove(fileId)
+        _receivedFiles.update { list -> list.filter { it.id != fileId } }
+    }
+
+    fun beginLiveUpload(fileId: String, expectedSize: Long): LiveUpload {
+        val live = LiveUpload(expectedSize)
+        liveUploads[fileId] = live
+        return live
+    }
+
+    fun liveUploadFor(fileId: String): LiveUpload? = liveUploads[fileId]
+
     fun incomingFilesForClient(clientIp: String): List<Pair<FileInfo, String>> {
         return _receivedFiles.value.mapNotNull { file ->
             val origin = receivedFileOrigins[file.id] ?: return@mapNotNull null
@@ -107,6 +124,4 @@ class ServiceRepository(
     fun serverStopped() { _runtimeState.update { it.copy(serviceState = RuntimeState.STOPPED) } }
 
     fun serverRunning() = _runtimeState.value.serviceState == RuntimeState.RUNNING
-
 }
-
