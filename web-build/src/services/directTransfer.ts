@@ -176,7 +176,7 @@ export class DirectTransferManager {
             try {
                 const message = JSON.parse(event.data);
                 if (message.type === 'ack') {
-                    this.report(id, file.name, 'sending', 'Waiting for receiver confirmation', file.size, file.size);
+                    this.report(id, file.name, 'sending', 'Sent directly', file.size, file.size);
                     this.outgoing.delete(id);
                     this.closePeer(id);
                 }
@@ -240,7 +240,7 @@ export class DirectTransferManager {
                 this.report(id, file.name, 'sending', 'Sending directly', offset, file.size);
             }
             channel.send(JSON.stringify({ type: 'finish' }));
-            this.report(id, file.name, 'sending', 'Sent directly', file.size, file.size);
+            this.report(id, file.name, 'sending', 'Waiting for receiver confirmation', file.size, file.size);
         } catch (error) {
             this.report(id, file.name, 'sending', 'Transfer failed', 0, file.size, (error as Error).message);
         }
