@@ -34,10 +34,16 @@ export interface WebActionInitializeFileUpload extends BaseWebAction {
     files: FileUploadInfo[]
 }
 
+export interface WebActionAbortFileUpload extends BaseWebAction {
+    type: 'abort_file_upload';
+    id: string;
+}
 
-export type WebAction = 
+
+export type WebAction =
     | WebActionRequestUploadPermission
     | WebActionInitializeFileUpload
+    | WebActionAbortFileUpload
 
 
 
@@ -73,6 +79,7 @@ export interface WebEventIncomingFile extends BaseWebEvent {
     mimeType: string;
     iconFile: string;
     from: string;
+    inProgress?: boolean;
 }
 
 export interface WebEventRemoveFile extends BaseWebEvent {
@@ -136,8 +143,8 @@ export interface SidebarItem {
     content: string;
     mimeType: string;
     label?: string;
-    text?: string; // For display in template
-    data?: string; // For display in template
+    text?: string;
+    data?: string;
 }
 
 export enum UploadFileState {
