@@ -2,6 +2,7 @@ package com.defname.localshare.service
 
 import android.content.Context
 import android.os.Environment
+import android.os.StatFs
 import android.util.Log
 import com.defname.localshare.data.RemoteCommunicationRepository
 import com.defname.localshare.service.notification.NotificationHelper
@@ -61,8 +62,12 @@ class DirectWebRtcReceiver(
                     notifications.showWebRtcIncomingNotification(sessionId, remoteIp, name, size)
                 }
                 "offer" -> acceptOffer(sessionId, remoteIp, signal)
-                "candidate" -> addCandidate(sessionId, signal.optJSONObject("candidate"))
-                "cancel" -> closeTransfer(sessionId, "Canceled by sender")
+                "candidate" -> {
+                    if (transfers[sessionId]?.remoteIp == remoteIp) addCandidate(sessionId, signal.optJSONObject("candidate"))
+                }
+                "cancel" -> {
+                    if (transfers[sessionId]?.remoteIp == remoteIp) closeTransfer(sessionId, "Canceled by sender")
+                }
             }
         } catch (error: Exception) {
             Log.e(TAG, "Invalid WebRTC signal for $sessionId", error)
@@ -135,6 +140,7 @@ class DirectWebRtcReceiver(
 
     private fun acceptOffer(id: String, remoteIp: String, signal: JSONObject) {
         val transfer = transfers[id] ?: return
+        if (transfer.remoteIp != remoteIp) return
         val description = signal.optJSONObject("description") ?: return
         val type = SessionDescription.Type.fromCanonicalForm(description.optString("type", "offer"))
         val remote = SessionDescription(type, description.optString("sdp"))
@@ -196,7 +202,18 @@ class DirectWebRtcReceiver(
                         val directory = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
                             ?: File(context.filesDir, "Downloads")
                         if (!directory.exists() && !directory.mkdirs()) throw IllegalStateException("Cannot create download folder")
-                        transfer.file = File(directory, transfer.name)
+                        val available = StatFs(directory.absolutePath).availableBytes
+                        if (transfer.expected > available) throw IllegalStateException("Not enough free storage space")
+                        var destination = File(directory, transfer.name)
+                        var suffix = 1
+                        val base = destination.nameWithoutExtension
+                        val extension = destination.extension
+                        while (destination.exists()) {
+                            val candidateName = if (extension.isBlank()) "$base ($suffix)" else "$base ($suffix).$extension"
+                            destination = File(directory, candidateName)
+                            suffix++
+                        }
+                        transfer.file = destination
                         transfer.output = BufferedOutputStream(FileOutputStream(transfer.file!!, false), 256 * 1024)
                         transfer.received = 0L
                         notifications.updateWebRtcNotification(transfer.id, "Receiving ${transfer.name}", 0, transfer.expected)
