@@ -130,10 +130,8 @@ class ServerSecurityHandler(
     }
 
     fun requestUploadPermission(ip: String) {
-        val whiteListEntry = securityRepository.whitelist.value.find { it.ip == ip }
-        if (whiteListEntry == null) {
-            return
-        }
+        // requestUploadPermission creates a whitelist entry when approval is disabled.
+        // Do not silently drop requests from valid-token clients that are not whitelisted yet.
         securityRepository.requestUploadPermission(ip)
         notificationHelper.showUploadPermissionNotification(ip)
     }
