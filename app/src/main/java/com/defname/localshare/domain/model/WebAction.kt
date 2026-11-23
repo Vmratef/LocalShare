@@ -123,4 +123,12 @@ sealed class WebEvent {
         val progress: Long = 0,
         val message: String? = null
     ) : WebEvent()
+
+    // Signaling envelopes contain only SDP/ICE metadata, never file content.
+    @Serializable @SerialName("web_rtc_signal")
+    data class WebRtcSignal(
+        val sessionId: String,
+        val from: String,
+        val payload: String
+    ) : WebEvent()
 }
