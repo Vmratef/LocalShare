@@ -151,10 +151,15 @@ export class DirectTransferManager {
                 }
                 break;
             }
-            case 'cancel':
+            case 'cancel': {
+                const peer = this.peers.get(id);
+                const file = this.outgoing.get(id);
+                if (peer?.writable) { try { await peer.writable.abort(); } catch { /* ignore */ } }
                 this.closePeer(id); this.offers.delete(id); this.outgoing.delete(id);
-                this.report(id, 'File', 'receiving', 'Canceled by sender', 0, 0);
+                this.report(id, file?.name || peer?.metadata?.name || 'File', peer?.direction || 'receiving',
+                    'Canceled by other device', peer?.received || 0, file?.size || peer?.metadata?.size || 0);
                 break;
+            }
         }
     }
 
@@ -166,6 +171,13 @@ export class DirectTransferManager {
         peer.channel = channel; channel.bufferedAmountLowThreshold = BUFFERED_LIMIT / 2;
         channel.onopen = () => { void this.sendFile(id, peer); };
         channel.onerror = () => this.report(id, file.name, 'sending', 'Data channel error', 0, file.size);
+        channel.onmessage = event => {
+            if (typeof event.data !== 'string') return;
+            try {
+                const message = JSON.parse(event.data);
+                if (message.type === 'ack') this.report(id, file.name, 'sending', 'Sent directly', file.size, file.size);
+            } catch { /* ignore unrelated channel messages */ }
+        };
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         await this.sendSignal(id, { kind: 'offer', description: pc.localDescription! }, remoteIp);
@@ -175,11 +187,11 @@ export class DirectTransferManager {
     private async createReceiverPeer(id: string, remoteIp: string, signal: Signal) {
         const peer = this.peers.get(id);
         if (!peer || peer.direction !== 'receiving' || !signal.description) return;
-        await peer.pc.setRemoteDescription(signal.description);
         peer.pc.ondatachannel = event => {
             peer.channel = event.channel; event.channel.binaryType = 'arraybuffer';
             event.channel.onmessage = message => { void this.receiveMessage(id, peer, message.data); };
         };
+        await peer.pc.setRemoteDescription(signal.description);
         const answer = await peer.pc.createAnswer();
         await peer.pc.setLocalDescription(answer);
         await this.sendSignal(id, { kind: 'answer', description: peer.pc.localDescription! }, remoteIp);
@@ -193,7 +205,7 @@ export class DirectTransferManager {
                 { kind: 'candidate', candidate: event.candidate.toJSON() }, remoteIp);
         };
         pc.onconnectionstatechange = () => {
-            if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+            if (pc.connectionState === 'failed') {
                 const file = this.outgoing.get(id); const peer = this.peers.get(id);
                 this.report(id, file?.name || peer?.metadata?.name || 'File', peer?.direction || 'sending',
                     'Direct connection failed. No Android relay fallback was used.',
@@ -236,6 +248,12 @@ export class DirectTransferManager {
                 this.report(id, message.name, 'receiving', 'Receiving directly', 0, message.size);
             } else if (message.type === 'finish') {
                 if (!peer.metadata) return;
+                if (peer.received !== peer.metadata.size) {
+                    if (peer.writable) await peer.writable.abort();
+                    this.report(id, peer.metadata.name, 'receiving', 'Transfer incomplete: size mismatch', peer.received, peer.metadata.size);
+                    this.closePeer(id);
+                    return;
+                }
                 if (peer.writable) await peer.writable.close();
                 else {
                     const blob = new Blob(peer.chunks, { type: peer.metadata.mimeType });
@@ -244,6 +262,7 @@ export class DirectTransferManager {
                     anchor.href = url; anchor.download = peer.metadata.name; anchor.click();
                     setTimeout(() => URL.revokeObjectURL(url), 60_000);
                 }
+                try { peer.channel?.send(JSON.stringify({ type: 'ack' })); } catch { /* sender may already be gone */ }
                 this.report(id, peer.metadata.name, 'receiving', 'Received directly',
                     peer.metadata.size, peer.metadata.size);
                 this.closePeer(id);
