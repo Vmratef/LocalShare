@@ -10,7 +10,7 @@ import { DirectTransferManager, DirectOffer, DirectTransferStatus } from '../ser
 export const FileManager = (initialFiles: FileInfo[]) => ({
     view: 'grid' as 'grid' | 'list',
     slideshow: false,
-    files: initialFiles,
+    files: Array.isArray(initialFiles) ? initialFiles : [],
     sortKey: 'filename' as keyof FileInfo,
     sortAsc: true,
     copiedId: null as string | null,
@@ -21,6 +21,10 @@ export const FileManager = (initialFiles: FileInfo[]) => ({
     rtc: null as DirectTransferManager | null,
 
     init() {
+        (window as any).LocalShareDebug?.log('info', 'FileManager initialized', {
+            initialFilesValid: Array.isArray(initialFiles),
+            initialFileCount: Array.isArray(initialFiles) ? initialFiles.length : 0
+        });
         const sse = Alpine.store('sse') as EventSource;
 
         sse.addEventListener('add_file', (event: MessageEvent) => {
