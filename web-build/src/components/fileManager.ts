@@ -14,7 +14,7 @@ export const FileManager = (initialFiles: FileInfo[]) => ({
     sortAsc: true,
     copiedId: null as string | null,
     currentIndex: 0,
-    incoming: [] as (FileInfo & { from: string })[],
+    incoming: [] as (FileInfo & { from: string; inProgress?: boolean })[],
 
     init() {
         const sse = Alpine.store('sse') as EventSource;
@@ -34,7 +34,6 @@ export const FileManager = (initialFiles: FileInfo[]) => ({
             }
         });
 
-        // A different device uploaded a file: offer it here (download or decline).
         sse.addEventListener('incoming_file', (event: MessageEvent) => {
             const data = JSON.parse(event.data) as WebEventIncomingFile;
             if (this.incoming.find(f => f.fileId === data.id)) return;
@@ -45,13 +44,15 @@ export const FileManager = (initialFiles: FileInfo[]) => ({
                 mimeType: data.mimeType,
                 icon: data.iconFile,
                 hasThumbnail: data.mimeType.startsWith('image/') || data.mimeType.startsWith('video/'),
-                from: data.from
+                from: data.from,
+                inProgress: data.inProgress === true
             });
         });
 
         sse.addEventListener('remove_file', (event: MessageEvent) => {
             const data = JSON.parse(event.data) as WebEventRemoveFile;
             this.files = this.files.filter(f => f.fileId !== data.id);
+            this.incoming = this.incoming.filter(f => f.fileId !== data.id);
             if (this.currentIndex >= this.files.length) {
                 this.currentIndex = Math.max(0, this.files.length - 1);
             }
@@ -75,12 +76,11 @@ export const FileManager = (initialFiles: FileInfo[]) => ({
 
     humanFileSize(size: number) { return humanFileSize(size); },
 
-    incomingThumb(item: FileInfo) {
-        return item.hasThumbnail ? getThumbnailUrl(item.fileId) : getFileIconUrl(item.icon);
+    incomingThumb(item: FileInfo & { inProgress?: boolean }) {
+        return (item.hasThumbnail && !item.inProgress) ? getThumbnailUrl(item.fileId) : getFileIconUrl(item.icon);
     },
 
-    acceptIncoming(item: FileInfo & { from: string }) {
-        // start the download and keep the file in this device's list
+    acceptIncoming(item: FileInfo & { from: string; inProgress?: boolean }) {
         const a = document.createElement('a');
         a.href = `/${window.token}/file/${item.fileId}?download`;
         a.download = item.filename;
@@ -88,7 +88,7 @@ export const FileManager = (initialFiles: FileInfo[]) => ({
         a.click();
         document.body.removeChild(a);
         if (!this.files.find(f => f.fileId === item.fileId)) {
-            const { from, ...plain } = item;
+            const { from, inProgress, ...plain } = item;
             this.files.push(plain);
         }
         this.dismissIncoming(item);
@@ -100,8 +100,6 @@ export const FileManager = (initialFiles: FileInfo[]) => ({
 
     loadPreview(el: HTMLImageElement, file: FileInfo) {
         if (!file) return;
-
-        // Reset to icon first
         const iconUrl = getFileIconUrl(file.icon);
         if (el.dataset.isSlideshow) {
             el.src = iconUrl;
@@ -109,16 +107,13 @@ export const FileManager = (initialFiles: FileInfo[]) => ({
         } else {
             el.src = iconUrl;
         }
-
         if (!file.hasThumbnail) return;
 
         const thumbUrl = getThumbnailUrl(file.fileId);
         const img = new Image();
         img.onload = () => {
-            // Check if still same file
             const currentId = el.dataset.isSlideshow ? this.currentFile?.fileId : file.fileId;
             if (file.fileId !== currentId) return;
-
             el.src = thumbUrl;
             if (el.dataset.isSlideshow) {
                 el.className = 'max-w-full max-h-[60vh] object-contain shadow-2xl rounded-lg';
@@ -131,11 +126,11 @@ export const FileManager = (initialFiles: FileInfo[]) => ({
 
     get sortedFiles(): FileInfo[] {
         return [...this.files].sort((a, b) => {
-            let valA = a[this.sortKey]; 
+            let valA = a[this.sortKey];
             let valB = b[this.sortKey];
-            if (typeof valA === 'string' && typeof valB === 'string') { 
-                valA = valA.toLowerCase(); 
-                valB = valB.toLowerCase(); 
+            if (typeof valA === 'string' && typeof valB === 'string') {
+                valA = valA.toLowerCase();
+                valB = valB.toLowerCase();
             }
             if (valA < valB) return this.sortAsc ? -1 : 1;
             if (valA > valB) return this.sortAsc ? 1 : -1;
@@ -148,7 +143,7 @@ export const FileManager = (initialFiles: FileInfo[]) => ({
         const success = await copyTextToClipboard(link);
         if (success) {
             this.copiedId = fileId;
-            setTimeout(() => { if(this.copiedId === fileId) this.copiedId = null; }, 2000);
+            setTimeout(() => { if (this.copiedId === fileId) this.copiedId = null; }, 2000);
         }
     }
 });
