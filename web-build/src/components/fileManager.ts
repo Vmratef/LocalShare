@@ -5,6 +5,7 @@
 import Alpine from 'alpinejs';
 import { FileInfo, WebEventAddFile, WebEventIncomingFile, WebEventRemoveFile } from '../types';
 import { humanFileSize, getThumbnailUrl, getFileIconUrl, copyTextToClipboard } from '../utils';
+import { DirectTransferManager, DirectOffer, DirectTransferStatus } from '../services/directTransfer';
 
 export const FileManager = (initialFiles: FileInfo[]) => ({
     view: 'grid' as 'grid' | 'list',
@@ -15,6 +16,9 @@ export const FileManager = (initialFiles: FileInfo[]) => ({
     copiedId: null as string | null,
     currentIndex: 0,
     incoming: [] as (FileInfo & { from: string; inProgress?: boolean })[],
+    directOffers: [] as DirectOffer[],
+    directTransfers: [] as DirectTransferStatus[],
+    rtc: null as DirectTransferManager | null,
 
     init() {
         const sse = Alpine.store('sse') as EventSource;
@@ -58,8 +62,21 @@ export const FileManager = (initialFiles: FileInfo[]) => ({
             }
         });
 
-        sse.addEventListener('init', () => {
+        sse.addEventListener('init', (event: MessageEvent) => {
             this.files = [];
+            const data = JSON.parse(event.data) as { clientId: string };
+            this.rtc?.dispose();
+            this.rtc = new DirectTransferManager(sse, data.clientId, {
+                onOffer: offer => {
+                    if (!this.directOffers.some(item => item.sessionId === offer.sessionId)) this.directOffers.push(offer);
+                },
+                onStatus: status => {
+                    const index = this.directTransfers.findIndex(item => item.sessionId === status.sessionId);
+                    if (index >= 0) this.directTransfers.splice(index, 1, status);
+                    else this.directTransfers.push(status);
+                }
+            });
+            Alpine.store('rtc', this.rtc);
         });
     },
 
@@ -79,6 +96,20 @@ export const FileManager = (initialFiles: FileInfo[]) => ({
     incomingThumb(item: FileInfo & { inProgress?: boolean }) {
         return (item.hasThumbnail && !item.inProgress) ? getThumbnailUrl(item.fileId) : getFileIconUrl(item.icon);
     },
+
+    async acceptDirect(offer: DirectOffer) {
+        try {
+            await this.rtc?.accept(offer.sessionId);
+            this.directOffers = this.directOffers.filter(item => item.sessionId !== offer.sessionId);
+        } catch (error) { alert((error as Error).message); }
+    },
+
+    async rejectDirect(offer: DirectOffer) {
+        await this.rtc?.reject(offer.sessionId);
+        this.directOffers = this.directOffers.filter(item => item.sessionId !== offer.sessionId);
+    },
+
+    cancelDirect(item: DirectTransferStatus) { void this.rtc?.cancel(item.sessionId); },
 
     acceptIncoming(item: FileInfo & { from: string; inProgress?: boolean }) {
         const a = document.createElement('a');
