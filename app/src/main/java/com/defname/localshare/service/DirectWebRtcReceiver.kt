@@ -45,6 +45,7 @@ class DirectWebRtcReceiver(
 
     private val transfers = ConcurrentHashMap<String, Transfer>()
     private val pendingCandidates = ConcurrentHashMap<String, MutableList<IceCandidate>>()
+    private val remoteDescriptionReady = ConcurrentHashMap.newKeySet<String>()
     private val writer: ExecutorService = Executors.newSingleThreadExecutor()
     private val factory: PeerConnectionFactory by lazy { createFactory() }
 
@@ -138,6 +139,7 @@ class DirectWebRtcReceiver(
         val remote = SessionDescription(type, description.optString("sdp"))
         transfer.peer.setRemoteDescription(object : SdpObserver {
             override fun onSetSuccess() {
+                remoteDescriptionReady.add(id)
                 pendingCandidates.remove(id)?.forEach { transfer.peer.addIceCandidate(it) }
                 transfer.peer.createAnswer(object : SdpObserver {
                     override fun onCreateSuccess(answer: SessionDescription?) {
