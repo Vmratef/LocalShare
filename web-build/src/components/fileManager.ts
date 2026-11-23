@@ -62,11 +62,9 @@ export const FileManager = (initialFiles: FileInfo[]) => ({
             }
         });
 
-        sse.addEventListener('init', (event: MessageEvent) => {
-            this.files = [];
-            const data = JSON.parse(event.data) as { clientId: string };
-            this.rtc?.dispose();
-            this.rtc = new DirectTransferManager(sse, data.clientId, {
+        const initializeRtc = (clientId: string) => {
+            if (!clientId || this.rtc) return;
+            this.rtc = new DirectTransferManager(sse, clientId, {
                 onOffer: offer => {
                     if (!this.directOffers.some(item => item.sessionId === offer.sessionId)) this.directOffers.push(offer);
                 },
@@ -77,7 +75,14 @@ export const FileManager = (initialFiles: FileInfo[]) => ({
                 }
             });
             Alpine.store('rtc', this.rtc);
+        };
+        sse.addEventListener('init', (event: MessageEvent) => {
+            this.files = [];
+            const data = JSON.parse(event.data) as { clientId: string };
+            initializeRtc(data.clientId);
         });
+        const existingClientId = Alpine.store('clientId') as string | null;
+        if (existingClientId) initializeRtc(existingClientId);
     },
 
     get currentFile(): FileInfo | undefined { return this.sortedFiles[this.currentIndex]; },
