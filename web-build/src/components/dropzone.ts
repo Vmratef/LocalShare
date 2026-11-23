@@ -9,25 +9,21 @@ import { humanFileSize } from '../utils';
 export const Dropzone = () => ({
     activeBatch: null as UploadBatch | null,
     dragActive: false,
-    trigger: 0,
-
     isProcessing: false,
     processingName: '',
     processingProgress: 0,
+    isSubmitting: false,
+    errorMessage: '',
 
     get isUploading(): boolean {
         return this.activeBatch?.state === UploadBatchState.UPLOADING;
     },
 
     get files() {
-        this.trigger
         return this.activeBatch?.files || [];
     },
 
-    init() {
-        // Start with a fresh draft batch
-        this.createNewBatch();
-    },
+    init() { this.createNewBatch(); },
 
     createNewBatch() {
         const appStore = Alpine.store('app') as any;
@@ -35,72 +31,67 @@ export const Dropzone = () => ({
     },
 
     async handleFiles(fileList: FileList | File[]) {
-        if (!this.activeBatch) this.createNewBatch();
-
-        // File metadata and a local upload key are enough to request approval.
-        // No file bytes are read until the receiver approves and transfer begins.
-        const files = Array.from(fileList);
-        for (const file of files) {
-            try {
-                await this.activeBatch!.addFile(file);
-            } catch (err) {
-                console.error(`Could not add file "${file.name}":`, err);
-                alert(`Could not add file: ${file.name}`);
+        if (!this.activeBatch || this.activeBatch.state !== UploadBatchState.DRAFT) return;
+        this.errorMessage = '';
+        this.isProcessing = true;
+        try {
+            for (const file of Array.from(fileList)) {
+                this.processingName = file.name;
+                this.processingProgress = 0;
+                try {
+                    const added = await this.activeBatch.addFile(file, (fraction: number) => {
+                        this.processingProgress = fraction;
+                    });
+                    if (!added) console.info('Skipped duplicate or canceled file: ' + file.name);
+                } catch (error) {
+                    console.error('Could not add file "' + file.name + '":', error);
+                    this.errorMessage = 'Could not check ' + file.name + ': ' + (error as Error).message;
+                }
             }
+        } finally {
+            this.isProcessing = false;
+            this.processingName = '';
+            this.processingProgress = 0;
         }
     },
 
-    dropFile(e: DragEvent) {
+    dropFile(event: DragEvent) {
         this.dragActive = false;
-        if (e.dataTransfer?.files) {
-            this.handleFiles(e.dataTransfer.files);
-        }
+        if (event.dataTransfer?.files) void this.handleFiles(event.dataTransfer.files);
     },
 
     removeFile(index: number) {
-        if (!this.activeBatch) return;
-        const file = this.activeBatch.files[index];
-        if (file) {
-            this.activeBatch.removeFile(file.checksum as string);
-        }
+        const file = this.activeBatch?.files[index];
+        if (file) this.activeBatch?.removeFile(file.checksum);
     },
 
     async submit() {
-        if (!this.activeBatch || this.activeBatch.files.length === 0) return;
-
+        const batch = this.activeBatch;
+        if (!batch || batch.files.length === 0 || this.isProcessing || this.isSubmitting) return;
+        this.errorMessage = '';
+        this.isSubmitting = true;
         try {
-            // 1. Initialize (Ask for permission/ID)
-            await this.activeBatch.initialize();
-            
-            // Note: The UI might need to wait for 'upload_accepted' SSE event 
-            // which changes state to ACCEPTED. 
-            // We can poll or watch for state change here.
-            
-            const checkState = () => {
-                if (this.activeBatch?.state === UploadBatchState.ACCEPTED) {
-                    this.activeBatch.start();
-                    // Close the modal when accepted
-                    (Alpine.store('app') as any).showUploadModal = false;
-                    // Reset for next time
-                    this.createNewBatch();
-                } else if (this.activeBatch?.state === UploadBatchState.REJECTED) {
-                    // No alert anymore, UI handles showing rejected state
-                    this.activeBatch.state = UploadBatchState.DRAFT; 
-                } else if (this.activeBatch?.state === UploadBatchState.REQUESTED) {
-                    setTimeout(checkState, 500);
-                }
-            };
-            
-            checkState();
-
-        } catch (err) {
-            console.error('Submit failed:', err);
-            alert('Could not start upload.');
+            await batch.initialize();
+            const decision = await batch.waitForDecision();
+            if (decision === UploadBatchState.ACCEPTED) {
+                (Alpine.store('app') as any).showUploadModal = false;
+                this.createNewBatch();
+                await batch.start();
+            } else if (decision === UploadBatchState.REJECTED) {
+                batch.state = UploadBatchState.DRAFT;
+                this.errorMessage = 'The receiving device declined this upload. You can try again.';
+            } else {
+                throw new Error('The upload request ended unexpectedly.');
+            }
+        } catch (error) {
+            this.errorMessage = (error as Error).message || 'Could not start upload.';
+            console.error('Submit failed:', error);
+        } finally {
+            this.isSubmitting = false;
         }
     },
 
     humanFileSize(size: number) { return humanFileSize(size); },
-
     dragOver() { this.dragActive = true; },
     dragLeave() { this.dragActive = false; }
 });
