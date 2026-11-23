@@ -27,7 +27,23 @@
       @keydown.window.left="isSlideshow && prevSlide()"
       @keydown.window.right="isSlideshow && nextSlide()">
 
-<!-- Incoming files from other devices: download or decline -->
+<!-- Direct WebRTC offers: file bytes never pass through Android -->
+<div x-show="directOffers.length > 0" x-cloak class="fixed top-4 right-4 z-[60] flex flex-col gap-3 w-80 max-w-full">
+    <template x-for="offer in directOffers" :key="offer.sessionId">
+        <div class="bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl border border-blue-300/50 rounded-xl shadow-xl p-3">
+            <div class="text-xs font-semibold text-blue-600 dark:text-blue-300">Direct WebRTC transfer request</div>
+            <div class="font-semibold truncate text-gray-800 dark:text-white" x-text="offer.name"></div>
+            <div class="text-xs text-gray-500" x-text="humanFileSize(offer.size) + ' · from ' + offer.from"></div>
+            <div class="text-[11px] text-gray-500 mt-1">File data transfers directly between browsers. Android only exchanges connection signals.</div>
+            <div class="flex gap-2 mt-3">
+                <button type="button" @click="acceptDirect(offer)" class="ls-btn-primary flex-1 py-2">Accept direct</button>
+                <button type="button" @click="rejectDirect(offer)" class="ls-btn-secondary flex-1 py-2">Decline</button>
+            </div>
+        </div>
+    </template>
+</div>
+
+<!-- Incoming files from the legacy Android relay: download or decline -->
 <div x-show="incoming.length > 0" x-cloak
      class="fixed bottom-4 right-4 z-50 flex flex-col gap-3 w-80 max-w-full">
     <template x-for="item in incoming" :key="item.fileId">
@@ -193,9 +209,8 @@
                 <p x-show="errorMessage" x-text="errorMessage" class="mt-3 text-sm text-red-600 dark:text-red-400" role="alert"></p>
                 <div class="mt-6 flex justify-end gap-3">
                     <button type="button" @click="$store.app.showUploadModal = false" class="ls-btn-secondary px-4 py-2">Close</button>
-                    <button type="submit" class="ls-btn-primary px-4 py-2" :disabled="files.length === 0 || isUploading || isSubmitting">
-                        <span x-text="isSubmitting ? 'Waiting for approval...' : isUploading ? 'Uploading...' : 'Upload'"></span>
-                    </button>
+                    <button type="button" @click="sendDirect()" class="ls-btn-primary px-4 py-2" :disabled="files.length === 0 || isUploading || isSubmitting">Send directly (WebRTC)</button>
+                    <button type="submit" class="ls-btn-secondary px-4 py-2" :disabled="files.length === 0 || isUploading || isSubmitting">Upload to Android</button>
                 </div>
             </form>
         </div>
@@ -245,6 +260,22 @@
                         </div>
                     </div>
                 </template>
+            </div>
+        </template>
+    </div>
+
+    <!-- Direct browser-to-browser transfer status -->
+    <div x-show="directTransfers.length > 0" class="mb-5 space-y-2" x-cloak>
+        <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider">Direct transfers (WebRTC)</h3>
+        <template x-for="transfer in directTransfers" :key="transfer.sessionId">
+            <div class="bg-white/60 dark:bg-slate-800/60 rounded-lg p-3 border border-blue-200/50 flex items-center gap-3">
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-medium truncate" x-text="transfer.name"></div>
+                    <div class="text-xs text-gray-500" x-text="transfer.status + ' · ' + humanFileSize(transfer.progress) + ' / ' + humanFileSize(transfer.size)"></div>
+                    <div class="ls-progress-container mt-2"><div class="ls-progress-bar" :style="'width:' + (transfer.size ? Math.min(100, transfer.progress / transfer.size * 100) : 0) + '%' "></div></div>
+                    <div x-show="transfer.error" class="text-xs text-red-500 mt-1" x-text="transfer.error"></div>
+                </div>
+                <button type="button" @click="cancelDirect(transfer)" class="ls-btn-secondary text-xs px-2 py-1">Cancel</button>
             </div>
         </template>
     </div>
