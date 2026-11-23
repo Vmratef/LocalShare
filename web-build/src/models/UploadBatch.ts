@@ -130,9 +130,9 @@ export class UploadBatch {
         try {
             const checksum = await this.calculateChecksum(file, onProgress, controller.signal);
             if (!this.files.some(existing => existing.checksum === pendingChecksum)) return false;
-            if (this.files.some(existing => existing !== pendingFile && existing.checksum === checksum)) {
+            if (this.files.some(existing => existing.checksum === checksum)) {
                 if (pendingFile.previewUrl) URL.revokeObjectURL(pendingFile.previewUrl);
-                this.files = this.files.filter(existing => existing !== pendingFile);
+                this.files = this.files.filter(existing => existing.checksum !== pendingChecksum);
                 return false;
             }
             pendingFile.checksum = checksum;

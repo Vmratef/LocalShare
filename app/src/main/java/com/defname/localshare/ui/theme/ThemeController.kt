@@ -39,13 +39,11 @@ object ThemeController {
     fun setLight(context: Context, palette: ThemePalette) {
         lightPalette = palette
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_LIGHT, palette.name).apply()
-        if (mode != ThemeMode.SYSTEM) set(context, ThemeMode.LIGHT)
     }
 
     fun setDark(context: Context, palette: ThemePalette) {
         darkPalette = palette
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_DARK, palette.name).apply()
-        if (mode != ThemeMode.SYSTEM) set(context, ThemeMode.DARK)
     }
 
     fun setPureBlack(context: Context, enabled: Boolean) {
