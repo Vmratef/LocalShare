@@ -18,7 +18,7 @@ export interface DirectTransferStatus {
     error?: string;
 }
 type Signal = {
-    kind: 'discover' | 'accept' | 'reject' | 'offer' | 'answer' | 'candidate' | 'cancel';
+    kind: 'discover' | 'accept' | 'reject' | 'busy' | 'offer' | 'answer' | 'candidate' | 'cancel';
     name?: string; size?: number; mimeType?: string;
     description?: RTCSessionDescriptionInit;
     candidate?: RTCIceCandidateInit;
@@ -124,11 +124,20 @@ export class DirectTransferManager {
             case 'accept': {
                 const file = this.outgoing.get(id);
                 if (file && !this.peers.has(id)) await this.createSenderPeer(id, from, file);
+                else if (file) await this.sendSignal(id, { kind: 'busy' }, from);
                 break;
             }
             case 'reject': {
                 const file = this.outgoing.get(id);
                 if (file) this.report(id, file.name, 'sending', 'Receiver declined', 0, file.size);
+                break;
+            }
+            case 'busy': {
+                const peer = this.peers.get(id);
+                if (peer?.direction === 'receiving') {
+                    this.closePeer(id);
+                    this.report(id, peer.metadata?.name || 'File', 'receiving', 'Sender is already connected to another receiver', 0, peer.metadata?.size || 0);
+                }
                 break;
             }
             case 'offer': await this.createReceiverPeer(id, from, signal); break;
