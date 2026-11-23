@@ -63,7 +63,8 @@ class DirectWebRtcReceiver(
                 }
                 "offer" -> acceptOffer(sessionId, remoteIp, signal)
                 "candidate" -> {
-                    if (transfers[sessionId]?.remoteIp == remoteIp) addCandidate(sessionId, signal.optJSONObject("candidate"))
+                    val active = transfers[sessionId]
+                    if (active == null || active.remoteIp == remoteIp) addCandidate(sessionId, signal.optJSONObject("candidate"))
                 }
                 "cancel" -> {
                     if (transfers[sessionId]?.remoteIp == remoteIp) closeTransfer(sessionId, "Canceled by sender")
@@ -135,6 +136,7 @@ class DirectWebRtcReceiver(
 
     fun reject(sessionId: String, remoteIp: String) {
         sendSignal(sessionId, remoteIp, JSONObject().put("kind", "reject"))
+        pendingCandidates.remove(sessionId)
         notifications.cancelWebRtcNotification(sessionId)
     }
 
@@ -183,7 +185,10 @@ class DirectWebRtcReceiver(
         )
         val transfer = transfers[id]
         if (transfer == null || !remoteDescriptionReady.contains(id)) {
-            pendingCandidates.computeIfAbsent(id) { java.util.Collections.synchronizedList(mutableListOf()) }.add(candidate)
+            val queue = pendingCandidates.computeIfAbsent(id) { java.util.Collections.synchronizedList(mutableListOf()) }
+            synchronized(queue) {
+                if (queue.size < 256) queue.add(candidate)
+            }
         } else {
             transfer.peer.addIceCandidate(candidate)
         }
