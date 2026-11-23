@@ -46,6 +46,7 @@ class DirectWebRtcReceiver(
         var expected: Long = 0,
         var received: Long = 0,
         var lastNotifiedBytes: Long = 0,
+        var completed: Boolean = false,
         var name: String = "file",
         var mimeType: String = "application/octet-stream"
     )
@@ -251,6 +252,7 @@ class DirectWebRtcReceiver(
                             fail(transfer.id, "File size mismatch: ${transfer.received}/${transfer.expected}")
                             return
                         }
+                        transfer.completed = true
                         transfer.channel?.send(DataChannel.Buffer(
                             ByteBuffer.wrap(JSONObject().put("type", "ack").toString().toByteArray(Charsets.UTF_8)), false
                         ))
@@ -283,6 +285,10 @@ class DirectWebRtcReceiver(
     }
 
     private fun fail(id: String, reason: String) {
+        if (transfers[id]?.completed == true) {
+            closeTransfer(id, null)
+            return
+        }
         notifications.updateWebRtcNotification(id, "Transfer failed: $reason", 0, 0)
         closeTransfer(id, reason)
     }
