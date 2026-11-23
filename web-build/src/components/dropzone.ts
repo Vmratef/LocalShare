@@ -37,15 +37,18 @@ export const Dropzone = () => ({
     },
 
     async handleFiles(fileList: FileList | File[]) {
+        const logger = (window as any).LocalShareDebug;
         this.errorMessage = '';
         const selectedFiles = Array.from(fileList || []);
-        if (selectedFiles.length === 0) return;
+        logger?.log('info', 'handleFiles entered', { inputType: Object.prototype.toString.call(fileList), count: selectedFiles.length, files: selectedFiles.map(file => ({ name: file.name, size: file.size, type: file.type })) });
+        if (selectedFiles.length === 0) { logger?.log('warn', 'handleFiles received zero files'); return; }
 
         // Recover automatically if the current draft was already submitted or not initialized.
         if (!this.activeBatch || this.activeBatch.state !== UploadBatchState.DRAFT) {
             this.createNewBatch();
         }
         const batch = this.activeBatch;
+        logger?.log('info', 'Upload batch ready', { exists: !!batch, state: batch?.state, filesBefore: batch?.files?.length });
         if (!batch) {
             this.errorMessage = 'The upload list could not be initialized. Close and reopen the upload window.';
             return;
@@ -53,9 +56,12 @@ export const Dropzone = () => ({
 
         for (const file of selectedFiles) {
             try {
+                logger?.log('info', 'Adding selected file', { name: file.name, size: file.size, type: file.type, isFile: file instanceof File });
                 const added = await batch.addFile(file);
+                logger?.log('info', 'addFile completed', { name: file.name, result: added, filesAfter: batch.files.length });
                 if (!added) throw new Error('The current upload draft is not ready.');
             } catch (error) {
+                logger?.log('error', 'Could not add selected file', { name: file.name, error: String(error), stack: (error as Error)?.stack });
                 console.error('Could not add file "' + file.name + '":', error);
                 this.errorMessage = 'Could not add ' + file.name + ': ' + ((error as Error).message || 'Unknown error');
             }
@@ -63,6 +69,7 @@ export const Dropzone = () => ({
 
         // Refresh the reactive array explicitly for browsers with older FileList/reactivity behavior.
         batch.files = [...batch.files];
+        logger?.log('info', 'File selection processing finished', { selected: selectedFiles.length, visibleFiles: batch.files.length, names: batch.files.map(file => file.name), errorMessage: this.errorMessage });
         if (batch.files.length === 0 && !this.errorMessage) {
             this.errorMessage = 'No files were added. Please try selecting the file again.';
         }
