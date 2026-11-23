@@ -29,7 +29,7 @@ export class UploadBatch {
     draftId: number;
     id?: string;
     private abortController?: AbortController;
-    private hashingControllers = new Map<UploadFile, AbortController>();
+    private hashingControllers = new Map<string, AbortController>();
     private decisionResolver?: (state: UploadBatchState) => void;
 
     private handlers = {
@@ -125,10 +125,11 @@ export class UploadBatch {
         // Show the file immediately while its checksum is calculated.
         this.files = [...this.files, pendingFile];
         const controller = new AbortController();
-        this.hashingControllers.set(pendingFile, controller);
+        const pendingChecksum = pendingFile.checksum;
+        this.hashingControllers.set(pendingChecksum, controller);
         try {
             const checksum = await this.calculateChecksum(file, onProgress, controller.signal);
-            if (!this.files.includes(pendingFile)) return false;
+            if (!this.files.some(existing => existing.checksum === pendingChecksum)) return false;
             if (this.files.some(existing => existing !== pendingFile && existing.checksum === checksum)) {
                 if (pendingFile.previewUrl) URL.revokeObjectURL(pendingFile.previewUrl);
                 this.files = this.files.filter(existing => existing !== pendingFile);
@@ -139,19 +140,19 @@ export class UploadBatch {
             return true;
         } catch (error) {
             if (pendingFile.previewUrl) URL.revokeObjectURL(pendingFile.previewUrl);
-            this.files = this.files.filter(existing => existing !== pendingFile);
+            this.files = this.files.filter(existing => existing.checksum !== pendingChecksum);
             if ((error as any)?.name === 'AbortError') return false;
             throw error;
         } finally {
-            this.hashingControllers.delete(pendingFile);
+            this.hashingControllers.delete(pendingChecksum);
         }
     }
 
     removeFile(checksum: string) {
         const removed = this.files.find(file => file.checksum === checksum);
         if (!removed) return;
-        this.hashingControllers.get(removed)?.abort();
-        this.hashingControllers.delete(removed);
+        this.hashingControllers.get(checksum)?.abort();
+        this.hashingControllers.delete(checksum);
         if (removed.previewUrl) URL.revokeObjectURL(removed.previewUrl);
         this.files = this.files.filter(file => file !== removed);
     }
