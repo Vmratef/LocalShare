@@ -6,6 +6,7 @@ import Alpine from 'alpinejs';
 import {
     UploadFile,
     UploadFileState,
+    WebActionAbortFileUpload,
     WebActionInitializeFileUpload,
     WebEventUploadAccepted,
     WebEventUploadDenied,
@@ -63,7 +64,6 @@ export class UploadBatch {
         if (this.state !== UploadBatchState.DRAFT) return false;
         const mime = file.type || 'application/octet-stream';
         const previewUrl = (mime.startsWith('image/') || mime.startsWith('video/')) ? URL.createObjectURL(file) : undefined;
-        // This is an upload identifier, not a content hash. Avoid reading the file before upload.
         const checksum = 'file-' + this.draftId + '-' + Date.now() + '-' +
             Math.random().toString(36).slice(2) + '-' + this.files.length;
         const uploadFile: UploadFile = {
@@ -141,6 +141,21 @@ export class UploadBatch {
     abortUpload() {
         this.abortController?.abort();
         if (this.state === UploadBatchState.UPLOADING) this.state = UploadBatchState.CANCELED;
+    }
+
+    async cancel() {
+        if (this.state !== UploadBatchState.UPLOADING) return;
+        const batchId = this.id;
+        this.abortUpload();
+        this.files = this.files.map(file =>
+            file.state === UploadFileState.CONFIRMED ? file : { ...file, state: UploadFileState.CANCELED }
+        );
+        if (!batchId) return;
+        try {
+            await apiActionRequest({ type: 'abort_file_upload', id: batchId } as WebActionAbortFileUpload);
+        } catch (error) {
+            console.error('Could not tell the receiver about the cancel:', error);
+        }
     }
 
     private onUploadAccepted(event: WebEventUploadAccepted) {
