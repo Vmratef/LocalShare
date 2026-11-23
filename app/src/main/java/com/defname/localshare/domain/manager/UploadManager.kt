@@ -184,7 +184,7 @@ class UploadManager(
                 fileStorageProvider.finalizeFile(uri)
                 receivedFilesStore.record(uri, file.name, file.size, clientIp)
             }
-            serviceRepository.liveUploadFor(fileIdFor(uri))?.finished = true
+            serviceRepository.finishLiveUpload(fileIdFor(uri))
             uploadRepository.updateFileState(batchId, fileHash, UploadFileState.Finished)
 
             _uploadEvents.emit(
