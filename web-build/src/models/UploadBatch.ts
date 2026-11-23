@@ -115,7 +115,7 @@ export class UploadBatch {
         this.state = UploadBatchState.UPLOADING;
         this.abortController = new AbortController();
         await Promise.allSettled(this.files.map(file => this.uploadSingleFile(file, this.abortController!.signal)));
-        if (this.state !== UploadBatchState.CANCELED) this.state = UploadBatchState.FINISHED;
+        if (!this.abortController?.signal.aborted) this.state = UploadBatchState.FINISHED;
     }
 
     private async uploadSingleFile(file: UploadFile, signal: AbortSignal): Promise<void> {
