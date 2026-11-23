@@ -9,9 +9,6 @@ import { humanFileSize } from '../utils';
 export const Dropzone = () => ({
     activeBatch: null as UploadBatch | null,
     dragActive: false,
-    isProcessing: false,
-    processingName: '',
-    processingProgress: 0,
     isSubmitting: false,
     errorMessage: '',
 
@@ -31,27 +28,15 @@ export const Dropzone = () => ({
     },
 
     async handleFiles(fileList: FileList | File[]) {
-        if (!this.activeBatch || this.activeBatch.state !== UploadBatchState.DRAFT || this.isProcessing) return;
+        if (!this.activeBatch || this.activeBatch.state !== UploadBatchState.DRAFT) return;
         this.errorMessage = '';
-        this.isProcessing = true;
-        try {
-            for (const file of Array.from(fileList)) {
-                this.processingName = file.name;
-                this.processingProgress = 0;
-                try {
-                    const added = await this.activeBatch.addFile(file, (fraction: number) => {
-                        this.processingProgress = fraction;
-                    });
-                    if (!added) console.info('Skipped duplicate or canceled file: ' + file.name);
-                } catch (error) {
-                    console.error('Could not add file "' + file.name + '":', error);
-                    this.errorMessage = 'Could not check ' + file.name + ': ' + (error as Error).message;
-                }
+        for (const file of Array.from(fileList)) {
+            try {
+                await this.activeBatch.addFile(file);
+            } catch (error) {
+                console.error('Could not add file "' + file.name + '":', error);
+                this.errorMessage = 'Could not add ' + file.name + ': ' + (error as Error).message;
             }
-        } finally {
-            this.isProcessing = false;
-            this.processingName = '';
-            this.processingProgress = 0;
         }
     },
 
@@ -67,7 +52,7 @@ export const Dropzone = () => ({
 
     async submit() {
         const batch = this.activeBatch;
-        if (!batch || batch.files.length === 0 || this.isProcessing || this.isSubmitting) return;
+        if (!batch || batch.files.length === 0 || this.isSubmitting) return;
         this.errorMessage = '';
         this.isSubmitting = true;
         try {

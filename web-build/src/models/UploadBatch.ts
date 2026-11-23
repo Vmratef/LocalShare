@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Alpine from 'alpinejs';
-import { sha256 } from 'js-sha256';
 import {
     UploadFile,
     UploadFileState,
@@ -20,7 +19,6 @@ export enum UploadBatchState {
 }
 
 let nextDraftId = 1;
-const HASH_CHUNK_SIZE = 4 * 1024 * 1024; // 4 MiB: bounded memory, compatible with older WebViews.
 
 export class UploadBatch {
     private sse: EventSource;
@@ -29,7 +27,6 @@ export class UploadBatch {
     draftId: number;
     id?: string;
     private abortController?: AbortController;
-    private hashingControllers = new Map<string, AbortController>();
     private decisionResolver?: (state: UploadBatchState) => void;
 
     private handlers = {
@@ -46,8 +43,6 @@ export class UploadBatch {
 
     dispose() {
         this.abortUpload();
-        this.hashingControllers.forEach(controller => controller.abort());
-        this.hashingControllers.clear();
         this.files.forEach(file => { if (file.previewUrl) URL.revokeObjectURL(file.previewUrl); });
         this.removeSSEEventListeners();
     }
@@ -64,105 +59,31 @@ export class UploadBatch {
         this.sse.removeEventListener('upload_updated', this.handlers.updated);
     }
 
-    private readChunk(blob: Blob, signal: AbortSignal): Promise<ArrayBuffer> {
-        if (signal.aborted) return Promise.reject(new DOMException('Hashing canceled', 'AbortError'));
-        if (typeof blob.arrayBuffer === 'function') {
-            return blob.arrayBuffer().then(buffer => {
-                if (signal.aborted) throw new DOMException('Hashing canceled', 'AbortError');
-                return buffer;
-            });
-        }
-
-        // FileReader is the fallback for older Android System WebView versions.
-        return new Promise<ArrayBuffer>((resolve, reject) => {
-            const reader = new FileReader();
-            const cleanup = () => signal.removeEventListener('abort', onAbort);
-            const onAbort = () => reader.abort();
-            signal.addEventListener('abort', onAbort, { once: true });
-            reader.onload = () => {
-                cleanup();
-                if (reader.result instanceof ArrayBuffer) resolve(reader.result);
-                else reject(new Error('Could not read file chunk.'));
-            };
-            reader.onerror = () => {
-                cleanup();
-                reject(reader.error || new Error('Could not read file chunk.'));
-            };
-            reader.onabort = () => {
-                cleanup();
-                reject(new DOMException('Hashing canceled', 'AbortError'));
-            };
-            reader.readAsArrayBuffer(blob);
-        });
-    }
-
-    async calculateChecksum(file: File, onProgress?: (fraction: number) => void, signal?: AbortSignal): Promise<string> {
-        const hasher = sha256.create();
-        const abortSignal = signal || new AbortController().signal;
-        for (let offset = 0; offset < file.size; offset += HASH_CHUNK_SIZE) {
-            if (abortSignal.aborted) throw new DOMException('Hashing canceled', 'AbortError');
-            const end = Math.min(offset + HASH_CHUNK_SIZE, file.size);
-            const chunk = await this.readChunk(file.slice(offset, end), abortSignal);
-            hasher.update(new Uint8Array(chunk));
-            onProgress?.(end / Math.max(file.size, 1));
-            await new Promise<void>(resolve => setTimeout(resolve, 0));
-        }
-        if (abortSignal.aborted) throw new DOMException('Hashing canceled', 'AbortError');
-        onProgress?.(1);
-        return hasher.hex();
-    }
-
-    async addFile(file: File, onProgress?: (fraction: number) => void): Promise<boolean> {
+    async addFile(file: File): Promise<boolean> {
         if (this.state !== UploadBatchState.DRAFT) return false;
         const mime = file.type || 'application/octet-stream';
         const previewUrl = (mime.startsWith('image/') || mime.startsWith('video/')) ? URL.createObjectURL(file) : undefined;
-        const pendingFile: UploadFile = {
-            checksum: 'pending-' + this.draftId + '-' + Date.now() + '-' + this.files.length,
-            file, previewUrl, name: file.name, mimeType: mime, size: file.size,
+        // This is an upload identifier, not a content hash. Avoid reading the file before upload.
+        const checksum = 'file-' + this.draftId + '-' + Date.now() + '-' +
+            Math.random().toString(36).slice(2) + '-' + this.files.length;
+        const uploadFile: UploadFile = {
+            checksum, file, previewUrl, name: file.name, mimeType: mime, size: file.size,
             state: UploadFileState.PENDING, progress: 0
         };
-
-        // Show the file immediately while its checksum is calculated.
-        this.files = [...this.files, pendingFile];
-        const controller = new AbortController();
-        const pendingChecksum = pendingFile.checksum;
-        this.hashingControllers.set(pendingChecksum, controller);
-        try {
-            const checksum = await this.calculateChecksum(file, onProgress, controller.signal);
-            if (!this.files.some(existing => existing.checksum === pendingChecksum)) return false;
-            if (this.files.some(existing => existing.checksum === checksum)) {
-                if (pendingFile.previewUrl) URL.revokeObjectURL(pendingFile.previewUrl);
-                this.files = this.files.filter(existing => existing.checksum !== pendingChecksum);
-                return false;
-            }
-            pendingFile.checksum = checksum;
-            this.files = [...this.files];
-            return true;
-        } catch (error) {
-            if (pendingFile.previewUrl) URL.revokeObjectURL(pendingFile.previewUrl);
-            this.files = this.files.filter(existing => existing.checksum !== pendingChecksum);
-            if ((error as any)?.name === 'AbortError') return false;
-            throw error;
-        } finally {
-            this.hashingControllers.delete(pendingChecksum);
-        }
+        this.files = [...this.files, uploadFile];
+        return true;
     }
 
     removeFile(checksum: string) {
         const removed = this.files.find(file => file.checksum === checksum);
         if (!removed) return;
-        this.hashingControllers.get(checksum)?.abort();
-        this.hashingControllers.delete(checksum);
         if (removed.previewUrl) URL.revokeObjectURL(removed.previewUrl);
-        this.files = this.files.filter(file => file !== removed);
+        this.files = this.files.filter(file => file.checksum !== checksum);
     }
 
     async initialize() {
         if (this.state !== UploadBatchState.DRAFT) return;
         if (this.files.length === 0) throw new Error('Add at least one file before uploading.');
-        if (this.hashingControllers.size > 0 || this.files.some(file => file.checksum.startsWith('pending-'))) {
-            throw new Error('Please wait until file checks finish.');
-        }
         this.state = UploadBatchState.REQUESTED;
         try {
             await apiActionRequest({

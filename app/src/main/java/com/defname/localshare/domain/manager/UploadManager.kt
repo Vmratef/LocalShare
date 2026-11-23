@@ -21,7 +21,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import java.io.InputStream
-import java.security.MessageDigest
 
 class UploadManager(
     private val uploadRepository: UploadRepository,
@@ -145,8 +144,6 @@ class UploadManager(
         try {
             uploadRepository.updateFileState(batchId, fileHash, UploadFileState.Uploading(0))
 
-            // Verify the received bytes against the SHA-256 calculated by the browser.
-            val digest = MessageDigest.getInstance("SHA-256")
             var totalBytesRead = 0L
 
             // Blocking file/network I/O runs on the IO pool, so several devices can upload at the
@@ -160,7 +157,6 @@ class UploadManager(
                     while (true) {
                         bytesRead = inputStream.read(buffer)
                         if (bytesRead == -1) break
-                        digest.update(buffer, 0, bytesRead)
                         out.write(buffer, 0, bytesRead)
                         totalBytesRead += bytesRead
 
@@ -183,15 +179,10 @@ class UploadManager(
                 }
             }
 
-            val actualHash = digest.digest().joinToString("") { "%02x".format(it) }
-            if (totalBytesRead != file.size || !actualHash.equals(fileHash, ignoreCase = true)) {
+            if (totalBytesRead != file.size) {
                 fileStorageProvider.deleteFile(uri)
                 uploadRepository.updateFileState(batchId, fileHash, UploadFileState.Error)
-                val reason = if (totalBytesRead != file.size) {
-                    "File size mismatch: expected ${file.size} bytes, received $totalBytesRead bytes."
-                } else {
-                    "Checksum mismatch! File corrupted."
-                }
+                val reason = "File size mismatch: expected ${file.size} bytes, received $totalBytesRead bytes."
                 emitFileError(clientIp, batchId, fileHash, reason)
                 return
             }
