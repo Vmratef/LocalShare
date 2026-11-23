@@ -299,10 +299,12 @@ class DirectWebRtcReceiver(
         try { transfer?.channel?.dispose() } catch (_: Exception) { }
         try { transfer?.peer?.close() } catch (_: Exception) { }
         try { transfer?.peer?.dispose() } catch (_: Exception) { }
-        if (reason != null) {
+        pendingCandidates.remove(id)
+        pendingOffers.remove(id)
+        remoteDescriptionReady.remove(id)
+        if (reason != null && transfer?.completed != true) {
             try { transfer?.file?.delete() } catch (_: Exception) { }
         }
-        pendingCandidates.remove(id)
         if (reason != null) notifications.updateWebRtcNotification(id, reason, 0, 0)
     }
 
