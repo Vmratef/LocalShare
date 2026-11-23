@@ -64,7 +64,7 @@ sealed class WebEvent {
     @Serializable @SerialName("init")
     data class Init(
         val uploadsEnabled: Boolean,
-        val clientId: String
+        val clientId: String = ""
     ) : WebEvent()
 
     @Serializable @SerialName("add_file")
