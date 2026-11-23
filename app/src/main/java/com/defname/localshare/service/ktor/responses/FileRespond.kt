@@ -6,6 +6,7 @@ package com.defname.localshare.service.ktor.responses
 
 import android.content.Context
 import android.util.Log
+import com.defname.localshare.data.LiveUpload
 import com.defname.localshare.domain.model.FileInfo
 import com.defname.localshare.service.ServerSecurityHandler
 import io.ktor.http.ContentDisposition
@@ -21,25 +22,29 @@ import io.ktor.utils.io.CancellationException
 import io.ktor.utils.io.writeFully
 import io.ktor.utils.io.writer
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
+import java.io.InputStream
 
+/**
+ * @param liveUpload non-null while the file is still being uploaded by another device: the
+ *                   download then follows the growing file instead of stopping at its current end.
+ */
 suspend fun ApplicationCall.sendFile(
     fileInfo: FileInfo,
     isStream: Boolean,
     securityHandler: ServerSecurityHandler,
     onFileNotAvailable: (FileInfo) -> Unit,
-    context: Context
+    context: Context,
+    liveUpload: LiveUpload? = null
 ) {
     val fileUri = fileInfo.uri
     val fileName = fileInfo.name
 
     val mimeTypeString = fileInfo.mimeType
     val contentType = ContentType.parse(mimeTypeString)
-
-    // 2. filesize
     val fileSize = fileInfo.size
 
-    // 4. send file
     val inputStream = try {
         context.contentResolver.openInputStream(fileUri)
     } catch (e: Exception) {
@@ -61,21 +66,22 @@ suspend fun ApplicationCall.sendFile(
 
             override fun readFrom(): ByteReadChannel {
                 return writer(Dispatchers.IO) {
-                    // Wir öffnen den InputStream innerhalb des Writers
-                    inputStream.use { input ->
+                    val source: InputStream = if (liveUpload != null) {
+                        TailingInputStream(inputStream, liveUpload, fileSize) { !isActive }
+                    } else {
+                        inputStream
+                    }
+                    source.use { input ->
                         try {
-                            val buffer = ByteArray(256 * 1024) // 256KB buffer: far fewer loop iterations / ban checks per GB
+                            val buffer = ByteArray(256 * 1024)
                             var bytesRead: Int
 
                             while (input.read(buffer).also { bytesRead = it } != -1) {
-                                // WICHTIG: Hier prüfen wir bei jedem Buffer-Durchgang den Ban-Status
                                 if (!securityHandler.mayContinueDownload(this@sendFile.request)) {
                                     val clientIp = this@sendFile.request.local.remoteHost
                                     Log.d("FileServerService", "Abort download: Client $clientIp was banned.")
                                     throw CancellationException("Client banned")
                                 }
-
-                                // Daten in den Ktor-Channel schreiben
                                 channel.writeFully(buffer, 0, bytesRead)
                             }
                         } catch (e: Exception) {
@@ -84,7 +90,7 @@ suspend fun ApplicationCall.sendFile(
                             }
                             throw e
                         }
-                    } ?: throw Exception("Could not open InputStream")
+                    }
                 }.channel
             }
         })
