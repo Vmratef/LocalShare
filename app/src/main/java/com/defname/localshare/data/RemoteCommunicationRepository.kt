@@ -26,6 +26,8 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 
 
+data class IncomingWebRtcSignal(val sessionId: String, val remoteIp: String, val payload: String)
+
 @JvmName("asFileInfoDeltaEvents")
 fun Flow<List<FileInfo>>.asDeltaEvents() = asDeltaEvents { it.id }
 @JvmName("asSharedContentDeltaEvents")
@@ -41,6 +43,12 @@ class RemoteCommunicationRepository(
     private val repositoryScope: CoroutineScope
 ) {
     private val _clientEventFlows = ConcurrentHashMap<String, MutableSharedFlow<EventEnvelop>>()
+    val webRtcSignals = MutableSharedFlow<IncomingWebRtcSignal>(extraBufferCapacity = 64)
+
+    fun sendWebRtcSignal(sessionId: String, targetIp: String, payload: String) {
+        val event = EventEnvelop(event = WebEvent.WebRtcSignal(sessionId, "android", payload))
+        _clientEventFlows.getOrPut(targetIp) { MutableSharedFlow(extraBufferCapacity = 64) }.tryEmit(event)
+    }
 
     private fun incomingEvent(file: FileInfo, fromIp: String) = EventEnvelop(
         event = WebEvent.IncomingFile(
