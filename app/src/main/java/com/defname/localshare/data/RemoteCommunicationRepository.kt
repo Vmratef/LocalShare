@@ -137,6 +137,7 @@ class RemoteCommunicationRepository(
             }
             is WebAction.WebRtcSignal -> {
                 if (action.sessionId.isBlank() || action.sessionId.length > 128 || action.payload.length > 256 * 1024) return
+                webRtcSignals.tryEmit(IncomingWebRtcSignal(action.sessionId, remoteIp, action.payload))
                 val event = EventEnvelop(
                     event = WebEvent.WebRtcSignal(
                         sessionId = action.sessionId,
