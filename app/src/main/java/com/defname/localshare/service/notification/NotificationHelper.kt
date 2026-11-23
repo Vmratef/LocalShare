@@ -162,4 +162,73 @@ class NotificationHelper(private val context: Context) {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.notify("upload_request_$clientIp".hashCode(), notification)
     }
+
+    fun showWebRtcIncomingNotification(sessionId: String, remoteIp: String, filename: String, size: Long) {
+        val acceptIntent = Intent(context, LocalShareService::class.java).apply {
+            action = LocalShareService.ACTION_ACCEPT_WEBRTC
+            putExtra("session_id", sessionId)
+            putExtra("remote_ip", remoteIp)
+        }
+        val rejectIntent = Intent(context, LocalShareService::class.java).apply {
+            action = LocalShareService.ACTION_REJECT_WEBRTC
+            putExtra("session_id", sessionId)
+            putExtra("remote_ip", remoteIp)
+        }
+        val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        val accept = PendingIntent.getService(context, sessionId.hashCode(), acceptIntent, flags)
+        val reject = PendingIntent.getService(context, sessionId.hashCode() xor 0x40000000, rejectIntent, flags)
+        val notification = NotificationCompat.Builder(context, APPROVAL_CHANNEL_ID)
+            .setContentTitle("Incoming direct file")
+            .setContentText("$remoteIp wants to send $filename (${android.text.format.Formatter.formatFileSize(context, size)}).")
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_INCOMING_CALL)
+            .setDefaults(Notification.DEFAULT_ALL)
+            .setAutoCancel(true)
+            .addAction(0, "Accept", accept)
+            .addAction(0, "Reject", reject)
+            .build()
+        (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+            .notify(webRtcNotificationId(sessionId), notification)
+    }
+
+    fun updateWebRtcNotification(sessionId: String, message: String, progress: Long, total: Long) {
+        val percent = if (total > 0L) ((progress.coerceAtMost(total) * 100L) / total).toInt() else 0
+        val builder = NotificationCompat.Builder(context, APPROVAL_CHANNEL_ID)
+            .setContentTitle("LocalShare direct transfer")
+            .setContentText(message)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setOnlyAlertOnce(true)
+            .setOngoing(total > 0L && progress < total)
+        if (total > 0L && progress < total) builder.setProgress(100, percent, false)
+        (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+            .notify(webRtcNotificationId(sessionId), builder.build())
+    }
+
+    fun showWebRtcCompletedNotification(sessionId: String, filename: String, file: java.io.File?) {
+        val openIntent = Intent(context, MainActivity::class.java)
+        val pending = PendingIntent.getActivity(
+            context, sessionId.hashCode(), openIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val location = file?.absolutePath ?: "Downloads"
+        val notification = NotificationCompat.Builder(context, APPROVAL_CHANNEL_ID)
+            .setContentTitle("File received")
+            .setContentText("$filename saved. $location")
+            .setStyle(NotificationCompat.BigTextStyle().bigText("$filename received successfully. Saved to: $location"))
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentIntent(pending)
+            .setAutoCancel(true)
+            .build()
+        (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+            .notify(webRtcNotificationId(sessionId), notification)
+    }
+
+    fun cancelWebRtcNotification(sessionId: String) {
+        (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+            .cancel(webRtcNotificationId(sessionId))
+    }
+
+    private fun webRtcNotificationId(sessionId: String) = 700000 + (sessionId.hashCode() and 0x000FFFFF)
+
 }
