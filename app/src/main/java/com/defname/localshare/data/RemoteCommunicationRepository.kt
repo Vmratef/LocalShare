@@ -42,6 +42,18 @@ class RemoteCommunicationRepository(
 ) {
     private val _clientEventFlows = ConcurrentHashMap<String, MutableSharedFlow<EventEnvelop>>()
 
+    private fun incomingEvent(file: FileInfo, fromIp: String) = EventEnvelop(
+        event = WebEvent.IncomingFile(
+            id = file.id,
+            name = file.name,
+            size = file.size,
+            mimeType = file.mimeType,
+            iconFile = file.iconFile,
+            from = fromIp,
+            inProgress = serviceRepository.liveUploadFor(file.id)?.let { !it.finished && !it.failed } ?: false
+        )
+    )
+
     init {
         repositoryScope.launch {
             uploadManager.uploadEvents.collect { (event, clientIp) ->
@@ -50,16 +62,15 @@ class RemoteCommunicationRepository(
         }
         repositoryScope.launch {
             uploadManager.receivedFileEvents.collect { (file, fromIp) ->
-                val event = EventEnvelop(
-                    event = WebEvent.IncomingFile(
-                        id = file.id,
-                        name = file.name,
-                        size = file.size,
-                        mimeType = file.mimeType,
-                        iconFile = file.iconFile,
-                        from = fromIp
-                    )
-                )
+                val event = incomingEvent(file, fromIp)
+                _clientEventFlows.forEach { (ip, flow) ->
+                    if (ip != fromIp) flow.tryEmit(event)
+                }
+            }
+        }
+        repositoryScope.launch {
+            uploadManager.withdrawnFileEvents.collect { (fileId, fromIp) ->
+                val event = EventEnvelop(event = WebEvent.RemoveFile(fileId))
                 _clientEventFlows.forEach { (ip, flow) ->
                     if (ip != fromIp) flow.tryEmit(event)
                 }
@@ -68,9 +79,9 @@ class RemoteCommunicationRepository(
     }
 
     fun getStreamForClient(remoteIp: String): Flow<EventEnvelop> {
-        val personalFlow = _clientEventFlows.getOrPut(remoteIp, {
+        val personalFlow = _clientEventFlows.getOrPut(remoteIp) {
             MutableSharedFlow(extraBufferCapacity = 64)
-        })
+        }
 
         return merge(
             personalFlow,
@@ -78,33 +89,17 @@ class RemoteCommunicationRepository(
             observeGlobalEvents()
         ).onStart {
             emit(EventEnvelop(event = WebEvent.Init(settingsRepository.settingsFlow.first().uploadFeatureActive)))
-
-            // Replay outstanding incoming-file offers after a browser reconnects or opens late.
-            // The uploader must never receive its own incoming-file offer.
             serviceRepository.incomingFilesForClient(remoteIp).forEach { (file, fromIp) ->
-                emit(
-                    EventEnvelop(
-                        event = WebEvent.IncomingFile(
-                            id = file.id,
-                            name = file.name,
-                            size = file.size,
-                            mimeType = file.mimeType,
-                            iconFile = file.iconFile,
-                            from = fromIp
-                        )
-                    )
-                )
+                emit(incomingEvent(file, fromIp))
             }
         }
     }
 
     suspend fun sendEvent(eventTo: Pair<EventEnvelop, String>) {
         val clientIp = eventTo.second
-        val event = eventTo.first
-
         _clientEventFlows.getOrPut(clientIp) {
             MutableSharedFlow(extraBufferCapacity = 64)
-        }.emit(event)
+        }.emit(eventTo.first)
     }
 
     fun handleAction(envelope: ActionEnvelop, remoteIp: String) {
@@ -133,7 +128,6 @@ class RemoteCommunicationRepository(
                 }
             }
             is WebAction.WebRtcSignal -> {
-                // The server is a signaling broker only. Binary file chunks travel peer-to-peer.
                 if (action.sessionId.isBlank() || action.sessionId.length > 128 || action.payload.length > 256 * 1024) return
                 val event = EventEnvelop(
                     event = WebEvent.WebRtcSignal(
@@ -179,19 +173,14 @@ class RemoteCommunicationRepository(
                         mimeType = delta.obj.mimeType,
                         iconFile = delta.obj.iconFile
                     )
-
-                    is FlowDelta.Removed -> WebEvent.RemoveFile(
-                        id = delta.obj.id
-                    )
+                    is FlowDelta.Removed -> WebEvent.RemoveFile(id = delta.obj.id)
                 }
                 EventEnvelop(event = event)
             }
     }
 
     private fun observeSharedContent(): Flow<EventEnvelop> {
-        return serviceRepository.runtimeState.map {
-            it.sharedContentList
-        }
+        return serviceRepository.runtimeState.map { it.sharedContentList }
             .asDeltaEvents()
             .map { delta ->
                 val event = when (delta) {
