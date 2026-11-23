@@ -1,5 +1,6 @@
 package com.defname.localshare.domain.manager
 
+import android.net.Uri
 import com.defname.localshare.IconMap
 import com.defname.localshare.data.FileStorageProvider
 import com.defname.localshare.data.ReceivedFilesStore
@@ -32,13 +33,17 @@ class UploadManager(
     private val _openUploadRequests = MutableStateFlow(emptyList<DraftUploadBatch>())
     val openUploadRequests = _openUploadRequests.asStateFlow()
 
-    // Buffered, so one slow/stuck browser can never block the uploads of the other devices.
-    // (received file, uploader ip) -> the other devices get an "incoming file" offer
     private val _receivedFileEvents = MutableSharedFlow<Pair<FileInfo, String>>(
         extraBufferCapacity = 64,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
     val receivedFileEvents = _receivedFileEvents.asSharedFlow()
+
+    private val _withdrawnFileEvents = MutableSharedFlow<Pair<String, String>>(
+        extraBufferCapacity = 64,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    val withdrawnFileEvents = _withdrawnFileEvents.asSharedFlow()
 
     private val _uploadEvents = MutableSharedFlow<Pair<EventEnvelop, String>>(
         extraBufferCapacity = 512,
@@ -46,35 +51,25 @@ class UploadManager(
     )
     val uploadEvents = _uploadEvents.asSharedFlow()
 
+    private fun fileIdFor(uri: Uri): String = Integer.toHexString(uri.toString().hashCode()).lowercase()
+
     fun onNewUploadRequest(clientIp: String, draftId: Int, files: List<UploadFile>) {
-        if (findRequest(clientIp, draftId) != null) {
-            return
-        }
-        if (files.isEmpty()) {
-            return
-        }
+        if (findRequest(clientIp, draftId) != null || files.isEmpty()) return
         addRequest(clientIp, draftId, files)
     }
 
     suspend fun onRequestDenied(clientIp: String, draftId: Int) {
-        val request = removeRequest(clientIp, draftId) ?: return
-        val event = EventEnvelop(
-            event = WebEvent.UploadDenied(draftId)
-        )
-        _uploadEvents.emit(event to clientIp)
+        removeRequest(clientIp, draftId) ?: return
+        _uploadEvents.emit(EventEnvelop(event = WebEvent.UploadDenied(draftId)) to clientIp)
     }
 
     /**
-     * @param relayOnly true  -> files go to the app's private cache and are only offered to the OTHER
-     *                          devices (this device does not keep them in Downloads).
-     *                  false -> files are saved in Download/LocalShare on this device (and offered too).
+     * @param relayOnly true: keep the upload in app cache and offer it to OTHER devices only.
+     *                  false: save it in Downloads and offer it to other devices too.
      */
     suspend fun onRequestAccepted(clientIp: String, draftId: Int, relayOnly: Boolean = false) {
         val draft = removeRequest(clientIp, draftId) ?: return
-        
         val batchId = java.util.UUID.randomUUID().toString().take(6)
-        val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
-        val subFolder = "Upload_${timestamp}_$batchId"
 
         val fileErrors = mutableListOf<String>()
         val fileUris = draft.files.map { file ->
@@ -96,71 +91,69 @@ class UploadManager(
         }
 
         uploadRepository.initNewUploadBatch(batchId, draft, fileUris, relayOnly)
+        _uploadEvents.emit(EventEnvelop(event = WebEvent.UploadAccepted(draftId, batchId)) to clientIp)
 
-        val event = EventEnvelop(event = WebEvent.UploadAccepted(draftId, batchId))
-        _uploadEvents.emit(event to clientIp)
+        // Publish the incoming-file offer immediately. Downloads will tail the growing file.
+        draft.files.forEach { file ->
+            val uri = fileUris[file.checksum] ?: return@forEach
+            offerFile(clientIp, file, uri)
+        }
 
-        // emit file creation errors
-        for (fileHash in fileErrors) {
+        fileErrors.forEach { fileHash ->
             emitFileError(clientIp, batchId, fileHash, "File cannot be created.")
         }
     }
 
+    /** Cancel unfinished files and withdraw their offers from every receiving browser. */
     suspend fun onUploadCanceledByClient(clientIp: String, batchId: String) {
         val batch = uploadRepository.getBatch(batchId) ?: return
-        if (batch.clientIp != clientIp) {
-            return
-        }
+        if (batch.clientIp != clientIp) return
 
-        // delete files of batch
+        var anyFinished = false
         batch.files.forEach { file ->
-            file.uri?.also {
-                fileStorageProvider.deleteFile(it)
+            val uri = file.uri
+            if (file.state is UploadFileState.Finished) {
+                anyFinished = true
+                return@forEach
             }
+            if (uri != null) {
+                withdrawOffer(clientIp, uri)
+                fileStorageProvider.deleteFile(uri)
+            }
+            uploadRepository.updateFileState(batchId, file.checksum, UploadFileState.Canceled)
         }
-
-        uploadRepository.removeBatch(batchId)
+        if (!anyFinished) uploadRepository.removeBatch(batchId)
     }
 
     suspend fun onFileUpload(clientIp: String, batchId: String, fileHash: String, inputStream: InputStream) {
         val batch = uploadRepository.getBatch(batchId) ?: return
-        if (batch.clientIp != clientIp) {
-            return
-        }
+        if (batch.clientIp != clientIp) return
 
         val file = batch.files.find { it.checksum == fileHash } ?: return
         val uri = file.uri ?: return
-
-        if (file.state is UploadFileState.Uploading || file.state is UploadFileState.Finished) {
-            return
-        }
+        if (file.state is UploadFileState.Uploading || file.state is UploadFileState.Finished) return
 
         val outputStream = fileStorageProvider.openOutputStream(uri)
         if (outputStream == null) {
+            withdrawOffer(clientIp, uri)
             emitFileError(clientIp, batchId, fileHash, "File can not be written.")
             return
         }
 
         try {
             uploadRepository.updateFileState(batchId, fileHash, UploadFileState.Uploading(0))
-
             var totalBytesRead = 0L
 
-            // Blocking file/network I/O runs on the IO pool, so several devices can upload at the
-            // same time without starving the server's request threads.
             withContext(Dispatchers.IO) {
                 val buffer = ByteArray(64 * 1024)
-                var bytesRead: Int
                 var lastReport = 0L
-
                 outputStream.use { out ->
                     while (true) {
-                        bytesRead = inputStream.read(buffer)
+                        val bytesRead = inputStream.read(buffer)
                         if (bytesRead == -1) break
                         out.write(buffer, 0, bytesRead)
                         totalBytesRead += bytesRead
 
-                        // Report progress only every ~300 ms instead of every chunk.
                         val now = System.nanoTime()
                         if (now - lastReport > 300_000_000L) {
                             lastReport = now
@@ -180,10 +173,10 @@ class UploadManager(
             }
 
             if (totalBytesRead != file.size) {
+                withdrawOffer(clientIp, uri)
                 fileStorageProvider.deleteFile(uri)
                 uploadRepository.updateFileState(batchId, fileHash, UploadFileState.Error)
-                val reason = "File size mismatch: expected ${file.size} bytes, received $totalBytesRead bytes."
-                emitFileError(clientIp, batchId, fileHash, reason)
+                emitFileError(clientIp, batchId, fileHash, "File size mismatch: expected ${file.size} bytes, received $totalBytesRead bytes.")
                 return
             }
 
@@ -191,39 +184,26 @@ class UploadManager(
                 fileStorageProvider.finalizeFile(uri)
                 receivedFilesStore.record(uri, file.name, file.size, clientIp)
             }
+            serviceRepository.liveUploadFor(fileIdFor(uri))?.finished = true
             uploadRepository.updateFileState(batchId, fileHash, UploadFileState.Finished)
 
-            // Offer the received file to the OTHER connected devices (they can accept or decline).
-            val sharedMime = file.mimeType.ifBlank { "application/octet-stream" }
-            val receivedInfo = FileInfo(
-                id = Integer.toHexString(uri.toString().hashCode()).lowercase(),
-                uri = uri,
-                name = file.name,
-                size = file.size,
-                mimeType = sharedMime,
-                iconFile = IconMap.getIcon(sharedMime)
+            _uploadEvents.emit(
+                EventEnvelop(
+                    event = WebEvent.UploadUpdated(
+                        id = batchId,
+                        fileChecksum = fileHash,
+                        status = UploadStatus.FINISHED
+                    )
+                ) to clientIp
             )
-            serviceRepository.addReceivedFile(receivedInfo, clientIp)
-            _receivedFileEvents.emit(receivedInfo to clientIp)
-
-            val event = EventEnvelop(
-                event = WebEvent.UploadUpdated(
-                    id = batchId,
-                    fileChecksum = fileHash,
-                    status = UploadStatus.FINISHED
-                )
-            )
-            _uploadEvents.emit(event to clientIp)
         } catch (e: Exception) {
+            withdrawOffer(clientIp, uri)
             fileStorageProvider.deleteFile(uri)
             uploadRepository.updateFileState(batchId, fileHash, UploadFileState.Error)
             emitFileError(clientIp, batchId, fileHash, "Upload failed: ${e.message}")
         }
     }
 
-    /**
-     * Later decision: also keep a relayed batch on THIS device (copies it to Download/LocalShare).
-     */
     suspend fun saveRelayBatchToDevice(batchId: String): Int {
         val batch = uploadRepository.getBatch(batchId) ?: return 0
         if (!batch.relayOnly) return 0
@@ -232,9 +212,7 @@ class UploadManager(
         var allSaved = true
         val newFiles = batch.files.map { file ->
             val source = file.uri
-            if (source == null || file.state !is UploadFileState.Finished) {
-                return@map file
-            }
+            if (source == null || file.state !is UploadFileState.Finished) return@map file
             val target = fileStorageProvider.createOutputFile(file.name, file.mimeType, null)
             if (target == null) {
                 allSaved = false
@@ -255,41 +233,56 @@ class UploadManager(
         return saved
     }
 
-    private fun findRequest(clientIp: String, draftId: Int) = _openUploadRequests.value.find { it.draftId == draftId && it.clientIp == clientIp }
+    private suspend fun offerFile(clientIp: String, file: UploadFile, uri: Uri) {
+        val mime = file.mimeType.ifBlank { "application/octet-stream" }
+        val info = FileInfo(
+            id = fileIdFor(uri),
+            uri = uri,
+            name = file.name,
+            size = file.size,
+            mimeType = mime,
+            iconFile = IconMap.getIcon(mime)
+        )
+        serviceRepository.beginLiveUpload(info.id, file.size)
+        serviceRepository.addReceivedFile(info, clientIp)
+        _receivedFileEvents.emit(info to clientIp)
+    }
+
+    private suspend fun withdrawOffer(clientIp: String, uri: Uri) {
+        val id = fileIdFor(uri)
+        serviceRepository.liveUploadFor(id)?.failed = true
+        serviceRepository.removeReceivedFile(id)
+        _withdrawnFileEvents.emit(id to clientIp)
+    }
+
+    private fun findRequest(clientIp: String, draftId: Int) =
+        _openUploadRequests.value.find { it.draftId == draftId && it.clientIp == clientIp }
 
     private fun addRequest(clientIp: String, draftId: Int, files: List<UploadFile>) {
-        if (!featureFlagsProvider.uploadFeature.value) {
-            return
-        }
-        _openUploadRequests.update { list ->
-            list + DraftUploadBatch(draftId, clientIp, files)
-        }
+        if (!featureFlagsProvider.uploadFeature.value) return
+        _openUploadRequests.update { it + DraftUploadBatch(draftId, clientIp, files) }
     }
 
     private fun removeRequest(clientIp: String, draftId: Int): DraftUploadBatch? {
         val request = findRequest(clientIp, draftId) ?: return null
-        _openUploadRequests.update { list ->
-            list - request
-        }
+        _openUploadRequests.update { it - request }
         return request
     }
 
-    suspend private fun emitUploadError(clientIp: String, id: String, message: String? = null) {
-        val event = EventEnvelop(
-            event = WebEvent.UploadError(id, message)
-        )
-        _uploadEvents.emit(event to clientIp)
+    private suspend fun emitUploadError(clientIp: String, id: String, message: String? = null) {
+        _uploadEvents.emit(EventEnvelop(event = WebEvent.UploadError(id, message)) to clientIp)
     }
 
     private suspend fun emitFileError(clientIp: String, requestId: String, fileHash: String, message: String) {
-        val update = EventEnvelop(
-            event = WebEvent.UploadUpdated(
-                id = requestId,
-                fileChecksum = fileHash,
-                status = UploadStatus.ERROR,
-                message = message
-            )
+        _uploadEvents.emit(
+            EventEnvelop(
+                event = WebEvent.UploadUpdated(
+                    id = requestId,
+                    fileChecksum = fileHash,
+                    status = UploadStatus.ERROR,
+                    message = message
+                )
+            ) to clientIp
         )
-        _uploadEvents.emit(update to clientIp)
     }
 }
