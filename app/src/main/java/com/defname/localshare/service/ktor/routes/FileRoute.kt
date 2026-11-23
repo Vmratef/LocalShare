@@ -20,38 +20,37 @@ fun Route.getFile(
     context: Context
 ) {
     get("/{token}/file/{file}") {
-
         val download = (call.queryParameters["download"] != null)
         val requestedFile = call.parameters["file"]
-        val clientIp = call.request.local.remoteHost
 
-        //  1. validate
         if (!securityHandler.verifyAccess(call)) {
             return@get call.respondText("No Access.", status = HttpStatusCode.Forbidden)
         }
 
         val sharedFiles = serviceRepository.fileList.first()
-        // received files are only reachable by their explicit id (never in the ZIP / default file)
+        // Received files are only reachable by their explicit id (never in the ZIP / default file).
         val fileList = if (requestedFile != null) sharedFiles + serviceRepository.receivedFiles.value else sharedFiles
 
         if (fileList.isEmpty()) {
             return@get call.respondText("No File Selected\n", status = HttpStatusCode.NotFound)
         }
 
-        //  2. single file or zip
-
-        //  2.1
-            val fileInfo = if (requestedFile != null) fileList.find { it.id == requestedFile } else fileList[0]
+        val fileInfo = if (requestedFile != null) fileList.find { it.id == requestedFile } else fileList[0]
         if (fileInfo == null) {
             return@get call.respondText("File not found.", status = HttpStatusCode.NotFound)
         }
+
+        // A file that another device is still uploading is streamed while it grows.
+        val live = serviceRepository.liveUploadFor(fileInfo.id)
+            ?.takeIf { !it.finished && !it.failed }
 
         return@get call.sendFile(
             fileInfo = fileInfo,
             isStream = !download,
             securityHandler = securityHandler,
             onFileNotAvailable = { fileInfo -> serviceRepository.removeFile(fileInfo.uri) },
-            context = context
+            context = context,
+            liveUpload = live
         )
     }
 }
