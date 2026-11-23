@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.os.StatFs
 import android.util.Log
 import com.defname.localshare.data.RemoteCommunicationRepository
@@ -253,7 +255,7 @@ class DirectWebRtcReceiver(
                             ByteBuffer.wrap(JSONObject().put("type", "ack").toString().toByteArray(Charsets.UTF_8)), false
                         ))
                         notifications.showWebRtcCompletedNotification(transfer.id, transfer.name, transfer.file)
-                        closeTransfer(transfer.id, null)
+                        Handler(Looper.getMainLooper()).postDelayed({ closeTransfer(transfer.id, null) }, 1000L)
                     }
                     "cancel" -> closeTransfer(transfer.id, "Canceled by sender")
                 }
