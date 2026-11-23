@@ -171,13 +171,13 @@
             <form @submit.prevent="submit" class="text-center">
                 <div class="ls-dropzone"
                      :class="dragActive ? 'active' : 'inactive'"
-                     @click="$refs.fileInput.click()"
+                     @click.self="$refs.fileInput.click()"
                      @drop.prevent="dropFile($event)"
                      @dragover.prevent="dragOver"
                      @dragleave.prevent="dragLeave">
                     
                     <input x-ref="fileInput" class="hidden" type="file" multiple
-                           @change="handleFiles($event.target.files); $event.target.value = ''">
+                           @click.stop @change="onFileInputChange($event)">
                     
                     <div x-show="files.length === 0">
                         <p class="text-sm text-gray-600">Click or drop files here.</p>
@@ -400,6 +400,38 @@
             </template>
         </div>
     </div>
+</div>
+
+
+<!-- LocalShare diagnostics: capture file picker, upload queue, JS errors and WebView runtime events -->
+<div x-data="{ open: false, entries: [], init() {
+    const refresh = () => { this.entries = (window.LocalShareDebug?.getEntries?.() || []).slice(-250).reverse(); };
+    refresh();
+    window.addEventListener('localshare:debug', refresh);
+} }" class="fixed bottom-3 left-3 z-[100]">
+    <button type="button" @click="open = !open" class="rounded-full shadow-lg border border-slate-300 dark:border-slate-600 bg-slate-900 text-white text-xs font-semibold px-3 py-2">
+        Diagnostics <span x-text="'(' + (window.LocalShareDebug?.getEntries?.().length || 0) + ')'"></span>
+    </button>
+    <section x-show="open" x-cloak class="mt-2 w-[min(94vw,34rem)] max-h-[70vh] overflow-hidden rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 shadow-2xl text-slate-900 dark:text-white">
+        <header class="flex items-center justify-between gap-2 p-3 border-b border-slate-200 dark:border-slate-700">
+            <div><strong class="text-sm">Live diagnostics</strong><p class="text-[10px] text-slate-500">File picker → FileList → UploadBatch → UI</p></div>
+            <div class="flex gap-2">
+                <button type="button" @click="window.LocalShareDebug?.download()" class="text-xs px-2 py-1 rounded bg-blue-600 text-white">Download JSON</button>
+                <button type="button" @click="window.LocalShareDebug?.clear()" class="text-xs px-2 py-1 rounded bg-slate-200 dark:bg-slate-700">Clear</button>
+                <button type="button" @click="open = false" class="text-xs px-2 py-1 rounded bg-slate-200 dark:bg-slate-700">×</button>
+            </div>
+        </header>
+        <div class="p-2 max-h-[58vh] overflow-y-auto space-y-1">
+            <template x-for="(entry, index) in entries" :key="entry.time + '-' + index">
+                <article class="rounded p-2 text-[10px] font-mono bg-slate-100 dark:bg-slate-800">
+                    <div class="flex gap-2"><span class="text-slate-500" x-text="entry.time"></span><strong :class="entry.level === 'error' ? 'text-red-600' : entry.level === 'warn' ? 'text-amber-600' : 'text-blue-600'" x-text="entry.level.toUpperCase()"></strong></div>
+                    <div class="font-semibold break-words" x-text="entry.message"></div>
+                    <pre x-show="entry.details" class="mt-1 whitespace-pre-wrap break-words text-slate-600 dark:text-slate-300" x-text="JSON.stringify(entry.details, null, 2)"></pre>
+                </article>
+            </template>
+            <p x-show="entries.length === 0" class="text-xs text-slate-500 p-3">No events recorded yet.</p>
+        </div>
+    </section>
 </div>
 
 </body>
