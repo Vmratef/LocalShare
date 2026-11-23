@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
+import org.json.JSONObject
 
 
 data class IncomingWebRtcSignal(val sessionId: String, val remoteIp: String, val payload: String)
@@ -145,9 +146,14 @@ class RemoteCommunicationRepository(
                         payload = action.payload
                     )
                 )
-                _clientEventFlows.forEach { (ip, flow) ->
-                    if (ip != remoteIp && (action.targetIp == null || action.targetIp == ip)) {
-                        flow.tryEmit(event)
+                // Native Android handles incoming discovery. Do not expose a competing
+                // browser-side receive offer, which may buffer large files in memory.
+                val signalKind = runCatching { JSONObject(action.payload).optString("kind") }.getOrNull()
+                if (signalKind != "discover") {
+                    _clientEventFlows.forEach { (ip, flow) ->
+                        if (ip != remoteIp && (action.targetIp == null || action.targetIp == ip)) {
+                            flow.tryEmit(event)
+                        }
                     }
                 }
             }
