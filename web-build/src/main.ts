@@ -39,9 +39,6 @@ document.addEventListener('alpine:init', () => {
         '@click'() {
             (Alpine.store('app') as any).showUploadModal = true;
         },
-        'x-show'() {
-            return (Alpine.store('app') as any).uploadEnabled;
-        },
         'class': 'ls-btn-icon'
     }));
 
