@@ -88,7 +88,7 @@ class RemoteCommunicationRepository(
             observePermissionChangeFor(remoteIp),
             observeGlobalEvents()
         ).onStart {
-            emit(EventEnvelop(event = WebEvent.Init(settingsRepository.settingsFlow.first().uploadFeatureActive)))
+            emit(EventEnvelop(event = WebEvent.Init(settingsRepository.settingsFlow.first().uploadFeatureActive, remoteIp)))
             serviceRepository.incomingFilesForClient(remoteIp).forEach { (file, fromIp) ->
                 emit(incomingEvent(file, fromIp))
             }
