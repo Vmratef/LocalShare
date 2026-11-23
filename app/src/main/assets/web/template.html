@@ -176,7 +176,8 @@
                      @dragover.prevent="dragOver"
                      @dragleave.prevent="dragLeave">
                     
-                    <input x-ref="fileInput" class="hidden" type="file" multiple @change="handleFiles($event.target.files)">
+                    <input x-ref="fileInput" class="hidden" type="file" multiple
+                           @change="handleFiles($event.target.files); $event.target.value = ''">
                     
                     <div x-show="files.length === 0">
                         <p class="text-sm text-gray-600">Click or drop files here.</p>
