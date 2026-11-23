@@ -167,7 +167,7 @@
         </div>
 
         <!-- Dropzone / Upload State -->
-        <div x-show="$store.app.uploadPermissionStatus === 'granted'" x-data="dropzone">
+        <div x-data="dropzone">
             <form @submit.prevent="submit" class="text-center">
                 <div class="ls-dropzone"
                      :class="dragActive ? 'active' : 'inactive'"
@@ -210,7 +210,7 @@
                 <div class="mt-6 flex justify-end gap-3">
                     <button type="button" @click="$store.app.showUploadModal = false" class="ls-btn-secondary px-4 py-2">Close</button>
                     <button type="button" @click="sendDirect()" class="ls-btn-primary px-4 py-2" :disabled="files.length === 0 || isUploading || isSubmitting">Send directly (WebRTC)</button>
-                    <button type="submit" class="ls-btn-secondary px-4 py-2" :disabled="files.length === 0 || isUploading || isSubmitting">Upload to Android</button>
+                    <button type="submit" x-show="$store.app.uploadPermissionStatus === 'granted'" class="ls-btn-secondary px-4 py-2" :disabled="files.length === 0 || isUploading || isSubmitting">Upload to Android (legacy)</button>
                 </div>
             </form>
         </div>
