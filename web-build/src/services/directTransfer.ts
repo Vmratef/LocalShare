@@ -28,7 +28,7 @@ type PeerState = {
     direction: 'sending' | 'receiving'; received: number; chunks: BlobPart[];
     writable?: any; writeChain: Promise<void>; metadata?: { name: string; size: number; mimeType: string };
 };
-const CHUNK_SIZE = 256 * 1024;
+const CHUNK_SIZE = 64 * 1024;
 const BUFFERED_LIMIT = 1024 * 1024;
 const MAX_IN_MEMORY_FALLBACK = 512 * 1024 * 1024;
 
@@ -231,7 +231,7 @@ export class DirectTransferManager {
                     await new Promise<void>(resolve => channel.addEventListener('bufferedamountlow', () => resolve(), { once: true }));
                 }
                 const end = Math.min(offset + CHUNK_SIZE, file.size);
-                channel.send(await file.slice(offset, end).arrayBuffer());
+                channel.send(await this.readSlice(file.slice(offset, end)));
                 offset = end;
                 this.report(id, file.name, 'sending', 'Sending directly', offset, file.size);
             }
@@ -240,6 +240,16 @@ export class DirectTransferManager {
         } catch (error) {
             this.report(id, file.name, 'sending', 'Transfer failed', 0, file.size, (error as Error).message);
         }
+    }
+
+    private readSlice(blob: Blob): Promise<ArrayBuffer> {
+        if (typeof (blob as any).arrayBuffer === 'function') return (blob as any).arrayBuffer();
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as ArrayBuffer);
+            reader.onerror = () => reject(reader.error || new Error('Could not read file chunk.'));
+            reader.readAsArrayBuffer(blob);
+        });
     }
 
     private async receiveMessage(id: string, peer: PeerState, data: any) {
