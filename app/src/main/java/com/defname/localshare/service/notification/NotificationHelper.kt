@@ -182,7 +182,7 @@ class NotificationHelper(private val context: Context) {
             .setContentText("$remoteIp wants to send $filename (${android.text.format.Formatter.formatFileSize(context, size)}).")
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_INCOMING_CALL)
+            .setCategory(NotificationCompat.CATEGORY_EVENT)
             .setDefaults(Notification.DEFAULT_ALL)
             .setAutoCancel(true)
             .addAction(0, "Accept", accept)
