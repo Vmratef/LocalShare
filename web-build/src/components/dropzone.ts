@@ -28,15 +28,34 @@ export const Dropzone = () => ({
     },
 
     async handleFiles(fileList: FileList | File[]) {
-        if (!this.activeBatch || this.activeBatch.state !== UploadBatchState.DRAFT) return;
         this.errorMessage = '';
-        for (const file of Array.from(fileList)) {
+        const selectedFiles = Array.from(fileList || []);
+        if (selectedFiles.length === 0) return;
+
+        // Recover automatically if the current draft was already submitted or not initialized.
+        if (!this.activeBatch || this.activeBatch.state !== UploadBatchState.DRAFT) {
+            this.createNewBatch();
+        }
+        const batch = this.activeBatch;
+        if (!batch) {
+            this.errorMessage = 'The upload list could not be initialized. Close and reopen the upload window.';
+            return;
+        }
+
+        for (const file of selectedFiles) {
             try {
-                await this.activeBatch.addFile(file);
+                const added = await batch.addFile(file);
+                if (!added) throw new Error('The current upload draft is not ready.');
             } catch (error) {
                 console.error('Could not add file "' + file.name + '":', error);
-                this.errorMessage = 'Could not add ' + file.name + ': ' + (error as Error).message;
+                this.errorMessage = 'Could not add ' + file.name + ': ' + ((error as Error).message || 'Unknown error');
             }
+        }
+
+        // Refresh the reactive array explicitly for browsers with older FileList/reactivity behavior.
+        batch.files = [...batch.files];
+        if (batch.files.length === 0 && !this.errorMessage) {
+            this.errorMessage = 'No files were added. Please try selecting the file again.';
         }
     },
 
