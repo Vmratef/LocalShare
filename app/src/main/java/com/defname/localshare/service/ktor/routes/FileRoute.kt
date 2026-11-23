@@ -48,7 +48,10 @@ fun Route.getFile(
             fileInfo = fileInfo,
             isStream = !download,
             securityHandler = securityHandler,
-            onFileNotAvailable = { fileInfo -> serviceRepository.removeFile(fileInfo.uri) },
+            onFileNotAvailable = { fileInfo ->
+                serviceRepository.removeFile(fileInfo.uri)
+                serviceRepository.removeReceivedFile(fileInfo.id)
+            },
             context = context,
             liveUpload = live
         )
