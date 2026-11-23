@@ -1,6 +1,9 @@
 package com.defname.localshare.service
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Environment
 import android.os.StatFs
 import android.util.Log
@@ -204,8 +207,14 @@ class DirectWebRtcReceiver(
                         transfer.expected = message.optLong("size", -1L)
                         transfer.mimeType = message.optString("mimeType", "application/octet-stream")
                         if (transfer.expected < 0L) throw IllegalArgumentException("Invalid file size")
-                        val directory = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-                            ?: File(context.filesDir, "Downloads")
+                        val publicDownloads = File(
+                            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                            "LocalShare"
+                        )
+                        val canWritePublicDownloads = Build.VERSION.SDK_INT <= Build.VERSION_CODES.P &&
+                            context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+                        val directory = if (canWritePublicDownloads) publicDownloads else
+                            (context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: File(context.filesDir, "Downloads"))
                         if (!directory.exists() && !directory.mkdirs()) throw IllegalStateException("Cannot create download folder")
                         val available = StatFs(directory.absolutePath).availableBytes
                         if (transfer.expected > available) throw IllegalStateException("Not enough free storage space")
